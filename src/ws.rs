@@ -1,12 +1,14 @@
 //! WebSocket game hub and the Penguin Chat wire protocol.
 
 use std::collections::HashMap;
+use std::net::SocketAddr;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
-use axum::extract::State;
+use axum::extract::{ConnectInfo, State};
+use axum::http::{header, HeaderMap};
 use axum::response::Response;
 use futures_util::{SinkExt, StreamExt};
 use serde::Serialize;
@@ -167,9 +169,59 @@ impl Hub {
     }
 }
 
+/// Client identity captured at the HTTP upgrade, before the WebSocket handshake
+/// completes. Used for login audit logging.
+struct ClientInfo {
+    ip: String,
+    user_agent: Option<String>,
+}
+
+impl ClientInfo {
+    /// Resolve the client IP honoring proxy headers, then the `User-Agent`.
+    ///
+    /// The peer address is only a fallback: behind a reverse proxy it is the
+    /// proxy's address, so the forwarded headers take precedence.
+    fn from_headers(headers: &HeaderMap, peer: Option<SocketAddr>) -> Self {
+        let ip = forwarded_ip(headers).unwrap_or_else(|| {
+            peer.map(|addr| addr.ip().to_string())
+                .unwrap_or_else(|| "unknown".to_owned())
+        });
+        let user_agent = headers
+            .get(header::USER_AGENT)
+            .and_then(|value| value.to_str().ok())
+            .filter(|value| !value.is_empty())
+            .map(str::to_owned);
+        Self { ip, user_agent }
+    }
+}
+
+/// Resolve the originating client IP from the headers a reverse proxy sets.
+///
+/// `X-Forwarded-For` is a comma-separated chain; its first (left-most) entry is
+/// the original client, with later entries appended by each proxy hop. Falls
+/// back to `X-Real-IP` when absent.
+fn forwarded_ip(headers: &HeaderMap) -> Option<String> {
+    headers
+        .get("x-forwarded-for")
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.split(',').next())
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_owned)
+        .or_else(|| {
+            headers
+                .get("x-real-ip")
+                .and_then(|value| value.to_str().ok())
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(str::to_owned)
+        })
+}
+
 /// A single WebSocket connection and its state machine.
 struct Connection {
     conn: String,
+    client: ClientInfo,
     hub: Arc<Hub>,
     tx: mpsc::Sender<Message>,
     player_id: Option<String>,
@@ -260,7 +312,15 @@ impl Connection {
                 },
             },
         }));
-        tracing::info!(connection = %self.conn, player = %id, nickname = NICKNAME, room = ROOM, "penguin logged in");
+        tracing::info!(
+            connection = %self.conn,
+            player = %id,
+            nickname = NICKNAME,
+            room = ROOM,
+            ip = %self.client.ip,
+            user_agent = self.client.user_agent.as_deref().unwrap_or("-"),
+            "penguin logged in"
+        );
     }
 
     /// `join`: register in the hub, deliver the room state, announce to others.
@@ -452,17 +512,28 @@ fn utf16_len(value: &str) -> usize {
 }
 
 /// HTTP upgrade entry point for `GET /ws`.
-pub async fn ws_handler(State(state): State<AppState>, ws: WebSocketUpgrade) -> Response {
+pub async fn ws_handler(
+    State(state): State<AppState>,
+    ConnectInfo(peer): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
+    ws: WebSocketUpgrade,
+) -> Response {
     let conn = format!("conn-{}", NEXT_CONNECTION.fetch_add(1, Ordering::Relaxed));
-    tracing::info!(connection = %conn, "websocket connected");
+    let client = ClientInfo::from_headers(&headers, Some(peer));
+    tracing::info!(
+        connection = %conn,
+        ip = %client.ip,
+        user_agent = client.user_agent.as_deref().unwrap_or("-"),
+        "websocket connected"
+    );
     ws.max_message_size(MAX_FRAME_BYTES)
         .max_frame_size(MAX_FRAME_BYTES)
-        .on_upgrade(move |socket| handle_socket(socket, state, conn))
+        .on_upgrade(move |socket| handle_socket(socket, state, conn, client))
 }
 
 /// Drive one connection: a writer task drains the outbound channel while the read
 /// loop dispatches inbound frames until close, error, or shutdown.
-async fn handle_socket(socket: WebSocket, state: AppState, conn: String) {
+async fn handle_socket(socket: WebSocket, state: AppState, conn: String, client: ClientInfo) {
     let (mut sink, mut stream) = socket.split();
     let (tx, mut rx) = mpsc::channel::<Message>(OUTBOUND_QUEUE);
 
@@ -488,6 +559,7 @@ async fn handle_socket(socket: WebSocket, state: AppState, conn: String) {
 
     let mut connection = Connection {
         conn: conn.clone(),
+        client,
         hub: Arc::clone(&state.hub),
         tx: tx.clone(),
         player_id: None,

@@ -71,9 +71,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     tracing::info!(%addr, %dist_dir, version, "server listening");
 
-    axum::serve(listener, app)
-        .with_graceful_shutdown(shutdown_signal(shutdown_tx))
-        .await?;
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .with_graceful_shutdown(shutdown_signal(shutdown_tx))
+    .await?;
 
     tracing::info!("server stopped");
     Ok(())
