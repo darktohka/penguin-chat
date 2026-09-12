@@ -4,6 +4,8 @@ A self-hosted archival server for the browser revival of **Penguin Chat 1** (Exp
 
 It serves the original game client and the server from the same Docker image.
 
+Live at <https://penguinchat.tohka.us>.
+
 ## Run with Docker
 
 The published image is `darktohka/penguin-chat:latest` (also tagged `1.20.2`).
@@ -19,6 +21,8 @@ docker run -d \
 Then open <http://localhost:8080>.
 
 ### Docker Compose
+
+Available at [docker-compose.yml](./docker-compose.yml). When running behind a reverse proxy, please change `ports` to `expose` and put the container behind a shared network.
 
 ```sh
 docker compose up -d
@@ -67,8 +71,8 @@ Logs go to both stdout and a file under `LOGS_DIR`. File names follow
 
 ## Documentation
 
-- [docs/PROTOCOL.md](docs/PROTOCOL.md) - the full WebSocket protocol reference.
-- [docs/DEAD_FEATURES.md](docs/DEAD_FEATURES.md) - protocol messages and assets the client implements but never uses (for example, there is no emote button; the server still handles emotes for protocol parity).
+- [Protocol](docs/PROTOCOL.md) - the full WebSocket protocol reference.
+- [Dead features](docs/DEAD_FEATURES.md) - protocol messages and assets the client implements but never uses (for example, there is no emote button; the server still handles emotes for protocol parity).
 
 ## About this archive
 
