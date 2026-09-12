@@ -1,0 +1,17 @@
+services:
+  penguinchat:
+    build:
+      context: .
+      args:
+        VERSION: ${VERSION:-dev}
+    image: darktohka/penguin-chat:latest
+    ports:
+    - "8080:8080"
+    environment:
+      PORT: "8080"
+      DIST_DIR: /dist
+      LOGS_DIR: /logs
+      RUST_LOG: info
+    volumes:
+    - ./logs:/logs
+    restart: unless-stopped

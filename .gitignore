@@ -1,0 +1,5 @@
+target/
+.omo/
+.codegraph/
+logs/
+**/*.log

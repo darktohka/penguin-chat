@@ -1,0 +1,24 @@
+# Example Caddyfile for hosting Penguin Chat behind a reverse proxy.
+#
+# Caddy terminates TLS and proxies everything to the Penguin Chat server,
+# including the WebSocket upgrade at /ws. Replace `penguinchat.com` with your
+# own domain; Caddy obtains and renews the certificate automatically.
+#
+#   docker compose up -d
+#   caddy run --config Caddyfile
+
+penguinchat.com {
+	# If you run Caddy in Docker instead, target the service name and port:
+	# reverse_proxy penguinchat:8080
+	reverse_proxy 127.0.0.1:8080
+
+	# Keep the client and its assets cached.
+	@static path /assets/* /images/* /icons/*
+	header @static Cache-Control "public, max-age=86400"
+
+	encode zstd gzip
+
+	log {
+		output file /var/log/caddy/penguinchat.log
+	}
+}

@@ -1,0 +1,140 @@
+name: Build container
+
+on:
+  push:
+  workflow_dispatch:
+  repository_dispatch:
+
+env:
+  IMAGE_NAME: darktohka/penguin-chat
+  # Throwaway staging registry. It lives only for the duration of the merge job
+  # and never receives any credentials, so the per-architecture images staged
+  # there are never published anywhere.
+  STAGING: localhost:5000/penguin-chat
+
+jobs:
+  build:
+    name: Build ${{ matrix.arch }} image
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Build the image natively
+        run: docker build --build-arg "VERSION=$(tr -d '[:space:]' < VERSION)" -t penguin-chat:${{ matrix.arch }} .
+
+      - name: Save the image to a tar archive
+        run: docker save penguin-chat:${{ matrix.arch }} -o image-${{ matrix.arch }}.tar
+
+      - name: Upload the docker image artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: docker-image-${{ matrix.arch }}
+          path: image-${{ matrix.arch }}.tar
+          retention-days: 1
+
+  push:
+    name: Push multi-arch image
+    runs-on: ubuntu-24.04
+    needs: [build]
+    env:
+      DOCKER_CLI_EXPERIMENTAL: enabled
+      DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+      DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Read the version
+        id: version
+        run: |
+          set -eux
+          version="$(tr -d '[:space:]' < VERSION)"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "Publishing ${IMAGE_NAME}:latest and ${IMAGE_NAME}:${version}"
+
+      - name: Download docker image artifacts
+        uses: actions/download-artifact@v6
+        with:
+          pattern: docker-image-*
+          path: images
+
+      - name: Load the docker images
+        run: |
+          set -eux
+          for tar in images/docker-image-*/*.tar; do
+            echo "Loading $tar"
+            docker load -i "$tar"
+          done
+          docker images
+
+      - name: Start a throwaway local staging registry
+        run: |
+          set -eux
+          docker run -d --name staging-registry -p 5000:5000 registry:2
+
+      # Stage each architecture in the local registry. These tags exist only on
+      # the ephemeral runner hosting the staging registry; they are never
+      # pushed to Docker Hub.
+      - name: Stage the per-architecture images locally
+        run: |
+          set -eux
+          for arch in amd64 arm64; do
+            docker tag "penguin-chat:${arch}" "${STAGING}:${arch}"
+            docker push "${STAGING}:${arch}"
+          done
+
+      # Assemble the multi-arch manifests in the staging registry only, once for
+      # `latest` and once for the VERSION file's tag.
+      - name: Assemble the multi-arch manifests in the staging registry
+        run: |
+          set -eux
+          for tag in latest "${{ steps.version.outputs.version }}"; do
+            docker manifest create --insecure "${STAGING}:${tag}" \
+              "${STAGING}:amd64" \
+              "${STAGING}:arm64"
+            docker manifest push --insecure "${STAGING}:${tag}"
+          done
+
+      - name: Install skopeo
+        run: |
+          set -eux
+          if ! command -v skopeo >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends skopeo
+          fi
+          skopeo --version
+
+      # skopeo copies the whole image index (the multi-arch manifest) together
+      # with every referenced per-architecture manifest and its blobs from the
+      # staging registry to Docker Hub. Both `:latest` and the VERSION tag are
+      # created; no per-architecture tags are ever pushed.
+      - name: Push the multi-arch manifests to Docker Hub
+        run: |
+          set -eux
+          for tag in latest "${{ steps.version.outputs.version }}"; do
+            skopeo copy --all \
+              --src-tls-verify=false \
+              --dest-creds "${{ secrets.DOCKER_USERNAME }}:${{ secrets.DOCKER_PASSWORD }}" \
+              "docker://${STAGING}:${tag}" \
+              "docker://${IMAGE_NAME}:${tag}"
+          done
+
+      - name: Verify the published manifests
+        run: |
+          set -eux
+          for tag in latest "${{ steps.version.outputs.version }}"; do
+            skopeo inspect --raw \
+              --creds "${DOCKER_USERNAME}:${DOCKER_PASSWORD}" \
+              "docker://${IMAGE_NAME}:${tag}" > "manifest-${tag}.json"
+            cat "manifest-${tag}.json"
+            jq -e '.manifests | map(.platform.architecture) | sort == ["amd64","arm64"]' "manifest-${tag}.json"
+          done

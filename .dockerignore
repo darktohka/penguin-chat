@@ -1,0 +1,7 @@
+target/
+.git/
+.gitignore
+.omo/
+.codegraph/
+logs/
+**/*.log
