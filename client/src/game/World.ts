@@ -1,5 +1,5 @@
 import { Container, Graphics, Text, type Spritesheet } from "pixi.js";
-import { gsap } from "gsap";
+import { gsap } from "gsap/gsap-core";
 import {
   CHAT_INPUT_HEIGHT,
   CHAT_INPUT_LEFT,

@@ -1,5 +1,5 @@
 import { Assets, Container, Sprite, type Texture } from "pixi.js";
-import { gsap } from "gsap";
+import { gsap } from "gsap/gsap-core";
 import { ASSET_LOADING, SPINNER_STEP_SECONDS } from "../core/constants";
 import { backEase } from "./easing";
 

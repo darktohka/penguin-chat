@@ -6,7 +6,7 @@ import {
   type Spritesheet,
   type Texture,
 } from "pixi.js";
-import { gsap } from "gsap";
+import { gsap } from "gsap/gsap-core";
 import {
   BALLOON_FILL,
   BALLOON_FONT_SIZE,
