@@ -1,0 +1,22 @@
+{
+  "name": "penguin-chat-client",
+  "version": "1.20.2",
+  "private": true,
+  "type": "module",
+  "description": "Editable Vite + TypeScript + PixiJS source for the Penguin Chat 1 (Experimental Penguins) browser client.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "gsap": "^3.15.0",
+    "pixi.js": "^8.20.1"
+  },
+  "devDependencies": {
+    "typescript": "6.0.3",
+    "vite": "^8.3.0"
+  },
+  "packageManager": "bun@1.4.2"
+}

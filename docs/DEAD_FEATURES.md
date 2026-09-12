@@ -1,14 +1,14 @@
 # Dead Features
 
-The archived client under `dist/` contains protocol surface and assets that are
-shipped but **unreachable**. This file records them so nobody mistakes the
-absence of an in-game emote button, for example, for a server bug - and so the
-server's handling of these messages is understood as deliberate protocol parity
-rather than dead code.
+The archived client contains protocol surface and assets that are shipped but
+**unreachable**. This file records them so nobody mistakes the absence of an
+in-game emote button, for example, for a server bug - and so the server's
+handling of these messages is understood as deliberate protocol parity rather
+than dead code.
 
 Findings were derived by tracing call sites and event subscriptions in the
-minified bundle `dist/assets/index-zbILFWAl.js`. "0 call sites" means the method
-is defined but never invoked anywhere in the bundle.
+original minified bundle, now decompiled under `client/src`. "0 call sites" means
+the method is defined but never invoked anywhere in the client.
 
 ## Protocol surface the client can never send
 

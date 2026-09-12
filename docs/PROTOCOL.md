@@ -1,7 +1,7 @@
 # Penguin Chat WebSocket Protocol
 
-This document describes the wire protocol used between the archived Penguin Chat
-browser client (in `dist/`) and the Rust server. It is a reverse-engineered
+This document describes the wire protocol used between the Penguin Chat
+browser client (source in `client/`) and the Rust server. It is a reverse-engineered
 description of the original `wss://snowball.rocketsnail.com` protocol; this
 server reimplements it so the client can be self-hosted unchanged apart from the
 socket URL.

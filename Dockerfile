@@ -1,6 +1,20 @@
 # syntax=docker/dockerfile:1
 
-# --- Stage 1: build a fully static musl binary for the target architecture ----
+# --- Stage 1: build the web client from source -------------------------------
+FROM oven/bun:1-alpine AS client
+
+WORKDIR /client
+
+# Install dependencies against the lockfile for a reproducible build.
+COPY client/package.json client/bun.lock ./
+RUN bun install --frozen-lockfile
+
+COPY client/tsconfig.json client/vite.config.ts client/index.html ./
+COPY client/src ./src
+COPY client/public ./public
+RUN bun run build
+
+# --- Stage 2: build a fully static musl binary for the target architecture ----
 FROM rust:1-alpine AS builder
 
 # BuildKit supplies TARGETARCH (amd64 / arm64).
@@ -34,7 +48,7 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
     && cargo build --release --target "$target" \
     && cp "target/$target/release/penguinchat" /build/penguinchat
 
-# --- Stage 2: minimal scratch runtime ----------------------------------------
+# --- Stage 3: minimal scratch runtime ----------------------------------------
 FROM scratch
 
 # Callers pass --build-arg VERSION="$(cat VERSION)" so the image metadata cannot
@@ -45,7 +59,7 @@ LABEL org.opencontainers.image.title="Penguin Chat" \
       org.opencontainers.image.description="Self-hosted archival server for Penguin Chat 1 (Experimental Penguins)"
 
 COPY --from=builder /build/penguinchat /app/penguinchat
-COPY dist /dist
+COPY --from=client /client/dist /dist
 
 ENV DIST_DIR=/dist \
     PORT=8080 \

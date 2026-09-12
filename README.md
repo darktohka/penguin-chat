@@ -2,7 +2,7 @@
 
 A self-hosted archival server for the browser revival of **Penguin Chat 1** (Experimental Penguins), version **1.20.2**.
 
-It serves the original game client and the server from the same Docker image.
+It serves the game client and the server from the same Docker image.
 
 Live at <https://penguinchat.tohka.us>.
 
@@ -40,13 +40,23 @@ Replace `penguinchat.com` with your domain and point it at the app (in Docker, `
 
 ## Build from source
 
-You need a Rust toolchain (1.97+).
+The web client lives in [`client/`](./client) and is built with Vite. It is compiled automatically by the Docker image; to build it on its own you need [Bun](https://bun.sh) (1.4+):
 
 ```sh
-cargo run --release
+cd client
+bun install
+bun run build
 ```
 
-Or build the container image yourself:
+The Rust server requires a toolchain (1.97+). It serves `DIST_DIR`, so point it at the built client:
+
+```sh
+DIST_DIR=client/dist cargo run --release
+```
+
+For a dev server with hot reload and a `/ws` proxy to a local server on port 8080, run `bun run dev` inside `client/`.
+
+Or build the container image yourself (this builds both the client and the server):
 
 ```sh
 docker build -t darktohka/penguin-chat:latest .
@@ -77,7 +87,5 @@ Logs go to both stdout and a file under `LOGS_DIR`. File names follow
 ## About this archive
 
 This project exists to preserve the browser release of Penguin Chat 1 (Experimental Penguins).
-
-The client assets under `dist/` are the original build; the only modification is that the WebSocket URL now points at the same origin (`/ws`) instead of `wss://snowball.rocketsnail.com`.
 
 Penguin Chat and Experimental Penguins are © RocketSnail Games. This is an unofficial archival project and is not affiliated with RocketSnail Games. We love Penguin Chat and Club Penguin!
