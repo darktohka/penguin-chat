@@ -82,8 +82,8 @@ class Hole extends Container {
   private readonly clip = new PixiGraphics();
   private clipped: Container | null = null;
 
-  private readonly radiusX = PENGUIN_DIRECTIONS;
-  private readonly radiusY = PENGUIN_DIRECTIONS / 2;
+  private readonly radiusX = RING_WIDTH / 2;
+  private readonly radiusY = RING_HEIGHT / 2;
 
   constructor() {
     super();
