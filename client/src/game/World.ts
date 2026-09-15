@@ -6,9 +6,15 @@ import {
   CHAT_INPUT_MAX_LENGTH,
   CHAT_INPUT_WIDTH,
   DISCONNECT_BUTTON_POS,
+  EXTENDED,
   FONT_UI,
   GAME_HEIGHT,
   GAME_WIDTH,
+  HELP_TEXT_COLOR,
+  HELP_TEXT_FONT_SIZE,
+  HELP_TEXT_LEFT,
+  HELP_TEXT_RIGHT,
+  HELP_TEXT_TOP,
   LOG_BACKGROUND_ALPHA,
   LOG_BACKGROUND_COLOR,
   LOG_BORDER_WIDTH,
@@ -26,7 +32,8 @@ import {
   TOOLBAR_Y,
 } from "../core/constants";
 import type { GameClient, GameEvents } from "../net/GameClient";
-import { IconButton } from "../pixi/IconButton";
+import { playPop } from "../audio/sfx";
+import { IconButton, type IconHelp } from "../pixi/IconButton";
 import { Penguin } from "./Penguin";
 
 /** Clamp a value to `[min, max]`. */
@@ -58,6 +65,7 @@ export class World extends Container {
 
   private chatInput!: HTMLInputElement;
   private sendButton!: IconButton;
+  private helpLabel: Text | undefined;
   private chatCooldownTimer: ReturnType<typeof gsap.delayedCall> | undefined;
   private margin = 0;
   private unsubscribers: Array<() => void> = [];
@@ -176,6 +184,8 @@ export class World extends Container {
     this.sendButton = new IconButton({
       icon: "send",
       onClick: () => this.sendChat(),
+      help: { text: "Chat with other players", align: "left" },
+      onHelp: (help) => this.showHelp(help),
     });
     this.sendButton.position.set(SEND_BUTTON_POS.x, SEND_BUTTON_POS.y);
     this.toolbar.addChild(this.sendButton);
@@ -185,6 +195,8 @@ export class World extends Container {
       onClick: () => {
         this.logContainer.visible = !this.logContainer.visible;
       },
+      help: { text: "View current log", align: "left" },
+      onHelp: (help) => this.showHelp(help),
     });
     logButton.position.set(LOG_BUTTON_POS.x, LOG_BUTTON_POS.y);
     this.toolbar.addChild(logButton);
@@ -192,13 +204,48 @@ export class World extends Container {
     const disconnectButton = new IconButton({
       icon: "disconnect",
       onClick: () => this.onDisconnect?.(),
+      help: { text: "Disconnect", align: "right" },
+      onHelp: (help) => this.showHelp(help),
     });
     disconnectButton.position.set(
       DISCONNECT_BUTTON_POS.x,
       DISCONNECT_BUTTON_POS.y,
     );
     this.toolbar.addChild(disconnectButton);
+
+    if (EXTENDED) {
+      this.helpLabel = new Text({
+        text: "",
+        style: {
+          fontFamily: FONT_UI,
+          fontSize: HELP_TEXT_FONT_SIZE,
+          fill: HELP_TEXT_COLOR,
+        },
+      });
+      this.helpLabel.anchor.set(0, 0);
+      this.helpLabel.position.set(HELP_TEXT_LEFT, HELP_TEXT_TOP);
+      this.helpLabel.visible = false;
+      this.toolbar.addChild(this.helpLabel);
+    }
+
     this.addChild(this.toolbar);
+  }
+
+  /** Show (or clear) the gray hover help label next to the toolbar buttons. */
+  private showHelp(help: IconHelp | null): void {
+    if (!this.helpLabel) return;
+    if (!help) {
+      this.helpLabel.visible = false;
+      return;
+    }
+    const right = help.align === "right";
+    this.helpLabel.text = help.text;
+    this.helpLabel.anchor.set(right ? 1 : 0, 0);
+    this.helpLabel.position.set(
+      right ? HELP_TEXT_RIGHT : HELP_TEXT_LEFT,
+      HELP_TEXT_TOP,
+    );
+    this.helpLabel.visible = true;
   }
 
   private bindSocket(): void {
@@ -220,6 +267,7 @@ export class World extends Container {
         if (event.playerId === this.socket.playerId || document.hidden) {
           this.removePenguin(penguin);
         } else {
+          if (EXTENDED) playPop();
           const drop = penguin.playDrop();
           this.leaving.set(penguin, drop);
           drop.then(() => {
@@ -271,6 +319,7 @@ export class World extends Container {
     );
     this.players.set(id, penguin);
     this.playerLayer.addChild(penguin);
+    if (EXTENDED) playPop();
     if (playIntro) penguin.playIntro();
   }
 

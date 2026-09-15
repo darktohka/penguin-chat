@@ -14,10 +14,15 @@ import {
   BALLOON_LINE_HEIGHT,
   BALLOON_OFFSET_Y,
   BALLOON_WRAP_WIDTH,
+  EXTENDED,
+  FONT_UI,
   HOLE_DROP_TIMING,
   HOLE_INTRO_TIMING,
   HOLE_SPRITE_SCALE,
   HOLE_STEP_SECONDS,
+  NAME_TEXT_COLOR,
+  NAME_TEXT_FONT_SIZE,
+  NAME_TEXT_OFFSET_Y,
   PENGUIN_ANCHOR_Y,
   PENGUIN_ANIMATION_SPEED,
   PENGUIN_DEFAULT_DIRECTION,
@@ -66,6 +71,22 @@ function createBalloon(): Text {
   balloon.position.set(0, BALLOON_OFFSET_Y);
   balloon.visible = false;
   return balloon;
+}
+
+/** The name label drawn under a penguin (SWF `name` field). */
+function createNameLabel(displayName: string): Text {
+  const label = new Text({
+    text: displayName,
+    style: {
+      fontFamily: FONT_UI,
+      fontSize: NAME_TEXT_FONT_SIZE,
+      fill: NAME_TEXT_COLOR,
+      align: "center",
+    },
+  });
+  label.anchor.set(0.5, 0);
+  label.position.set(0, NAME_TEXT_OFFSET_Y);
+  return label;
 }
 
 /**
@@ -175,6 +196,7 @@ export class Penguin extends Container {
   private readonly sprite: AnimatedSprite;
   private readonly ring: Graphics | undefined;
   private readonly balloon: Text;
+  private readonly nameLabel: Text | undefined;
 
   private currentDir = PENGUIN_DEFAULT_DIRECTION;
   private balloonTimer: Delayed | undefined;
@@ -210,6 +232,11 @@ export class Penguin extends Container {
     this.sprite.animationSpeed = PENGUIN_ANIMATION_SPEED;
     this.sprite.gotoAndStop(0);
     this.addChild(this.sprite);
+
+    if (EXTENDED) {
+      this.nameLabel = createNameLabel(displayName);
+      this.addChild(this.nameLabel);
+    }
 
     this.balloon = createBalloon();
     this.addChild(this.balloon);
@@ -326,6 +353,7 @@ export class Penguin extends Container {
     const hole = new Hole();
     this.addChildAt(hole, 0);
     if (this.ring) this.ring.visible = false;
+    if (this.nameLabel) this.nameLabel.visible = false;
     this.hideBalloon();
     gsap.killTweensOf(this.sprite);
     this.sprite.textures = this.frames(
@@ -352,6 +380,7 @@ export class Penguin extends Container {
         this.sprite.y = 0;
         if (dropping) this.sprite.visible = false;
         else if (this.ring) this.ring.visible = true;
+        if (this.nameLabel) this.nameLabel.visible = !dropping;
       },
     });
 

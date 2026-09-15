@@ -1,18 +1,30 @@
 import { Container, Graphics } from "pixi.js";
 import {
+  EXTENDED,
   ICON_BUTTON_SIZE,
   ICON_DISABLED_ALPHA,
   ICON_DISABLED_FILL,
   ICON_FILL,
   ICON_HOVER_FILL,
+  ICON_HOVER_FILL_EXTENDED,
 } from "../core/constants";
 import { iconSprite } from "./assets";
+
+/** Help label shown next to a hovered button (extended). */
+export interface IconHelp {
+  text: string;
+  align: "left" | "right";
+}
 
 /** Options for an `IconButton`. */
 export interface IconButtonOptions {
   /** Icon alias, one of the keys of `ICON_SOURCES`. */
   icon: string;
   onClick: () => void;
+  /** Help label to expose while hovering (extended). */
+  help?: IconHelp;
+  /** Receives the help label on hover and `null` on leave (extended). */
+  onHelp?: (help: IconHelp | null) => void;
 }
 
 /**
@@ -35,10 +47,12 @@ export class IconButton extends Container {
     this.on("pointerover", () => {
       this.hovered = true;
       this.redraw();
+      if (EXTENDED) this.options.onHelp?.(this.options.help ?? null);
     });
     this.on("pointerout", () => {
       this.hovered = false;
       this.redraw();
+      if (EXTENDED) this.options.onHelp?.(null);
     });
     this.on("pointertap", () => {
       if (this.enabled) this.options.onClick();
@@ -53,14 +67,18 @@ export class IconButton extends Container {
     this.eventMode = enabled ? "static" : "none";
     this.cursor = enabled ? "pointer" : "default";
     this.icon.alpha = enabled ? 1 : ICON_DISABLED_ALPHA;
-    if (!enabled) this.hovered = false;
+    if (!enabled) {
+      this.hovered = false;
+      if (EXTENDED) this.options.onHelp?.(null);
+    }
     this.redraw();
   }
 
   private redraw(): void {
+    const hoverFill = EXTENDED ? ICON_HOVER_FILL_EXTENDED : ICON_HOVER_FILL;
     const fill = this.enabled
       ? this.hovered
-        ? ICON_HOVER_FILL
+        ? hoverFill
         : ICON_FILL
       : ICON_DISABLED_FILL;
     this.background

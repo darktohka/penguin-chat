@@ -133,6 +133,41 @@ export const BALLOON_OFFSET_Y = -46 - 47 / 2;
 /** Seconds a speech balloon stays visible. */
 export const BALLOON_HOLD_SECONDS = 8;
 
+/* Extended variant ---------------------------------------------------------- */
+
+/** SWF-faithful extended client: name labels, hover help, red hover, pop audio. */
+export const EXTENDED = true;
+
+/* Penguin name label (`Penguin`, extended) --------------------------------- */
+
+/** Name label under each penguin: black Arial 10px, centered (SWF `name` field). */
+export const NAME_TEXT_COLOR = 0x000000;
+export const NAME_TEXT_FONT_SIZE = 10;
+/** SWF `name` offset: 514 twips below the character origin, less a 40 twip inset. */
+export const NAME_TEXT_OFFSET_Y = 16;
+
+/* Hover help text (`World`, extended) -------------------------------------- */
+
+/** Help label: gray Arial 10px (SWF `help1`/`help2` fields). */
+export const HELP_TEXT_COLOR = 0x666666;
+export const HELP_TEXT_FONT_SIZE = 10;
+/** SWF help field top edge: 7165 twips less a 40 twip inset. */
+export const HELP_TEXT_TOP = 356;
+/** SWF `help1` left edge: 5844 twips less a 40 twip inset. */
+export const HELP_TEXT_LEFT = 290;
+/** SWF `help2` right edge: 8444 twips plus its 2557 twip width. */
+export const HELP_TEXT_RIGHT = 550;
+
+/* Icon buttons (`IconButton`, extended) ------------------------------------ */
+
+/** Hover fill for the toolbar buttons: SWF over-state shape `#ff0000`. */
+export const ICON_HOVER_FILL_EXTENDED = 0xff0000;
+
+/* Audio (extended) --------------------------------------------------------- */
+
+/** SWF sound 111; played when a penguin enters or leaves the world. */
+export const ASSET_POP_SOUND = "sounds/111.wav";
+
 /* Assets ------------------------------------------------------------------- */
 
 export const ASSET_SHEET = "assets/penguin/penguin.json";

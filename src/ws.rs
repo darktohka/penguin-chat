@@ -30,6 +30,10 @@ const CRITTER_TYPE: &str = "default";
 /// Guest nickname assigned to every anonymous player, as the original does.
 const NICKNAME: &str = "Guest";
 
+/// Extended server variant: include a top-level `nickname` in room snapshots so
+/// the client can label penguins without reading `critter.nickname`.
+const EXTENDED: bool = true;
+
 /// Chat/emote length caps are measured in UTF-16 code units, matching the
 /// client's JavaScript `String.length`, so the advertised limits line up exactly.
 const MAX_CHAT: usize = 60;
@@ -88,6 +92,8 @@ impl Critter {
 #[derive(Clone, Serialize)]
 pub struct PlayerSnapshot {
     pub id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub nickname: Option<String>,
     pub x: f64,
     pub y: f64,
     pub critter: Critter,
@@ -135,6 +141,7 @@ impl Hub {
             .iter()
             .map(|(id, player)| PlayerSnapshot {
                 id: id.clone(),
+                nickname: EXTENDED.then(|| NICKNAME.to_owned()),
                 x: player.x,
                 y: player.y,
                 critter: Critter::guest(NICKNAME),
