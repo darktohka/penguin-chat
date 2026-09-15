@@ -20,6 +20,8 @@ The original HTML 5 Experimental Penguins client has been extended to more close
 9. For the Crash Site, which did not have vector art, we've created custom vector art that resembles the original raster art. Z-order is kept.
 10. The penguin joining sound is back, with reduced volume.
 
+If you want to play the original **1.20.2** client without these additions, simply change **EXTENDED** to **false** in `constants.ts` and rebuild.
+
 ## Run with Docker
 
 The published image is `darktohka/penguin-chat:latest` (also tagged `1.20.2`).
