@@ -1,4 +1,4 @@
-import { Container, Text, type Graphics } from "pixi.js";
+import { Container, RenderLayer, Text, type Graphics } from "pixi.js";
 import { Graphics as PixiGraphics } from "pixi.js";
 import {
   AnimatedSprite,
@@ -193,6 +193,7 @@ export class Penguin extends Container {
   public readonly playerId: string;
   public readonly displayName: string;
   private readonly spritesheet: Spritesheet;
+  private readonly overlayLayer: RenderLayer;
   private readonly sprite: AnimatedSprite;
   private readonly ring: Graphics | undefined;
   private readonly balloon: Text;
@@ -211,12 +212,14 @@ export class Penguin extends Container {
     x: number,
     y: number,
     spritesheet: Spritesheet,
+    overlayLayer: RenderLayer,
     isLocal = false,
   ) {
     super();
     this.playerId = playerId;
     this.displayName = displayName;
     this.spritesheet = spritesheet;
+    this.overlayLayer = overlayLayer;
     this.x = x;
     this.y = y;
     this.confirmedX = x;
@@ -236,10 +239,12 @@ export class Penguin extends Container {
     if (EXTENDED) {
       this.nameLabel = createNameLabel(displayName);
       this.addChild(this.nameLabel);
+      this.overlayLayer.attach(this.nameLabel);
     }
 
     this.balloon = createBalloon();
     this.addChild(this.balloon);
+    this.overlayLayer.attach(this.balloon);
 
     this.pivot.set(0, 0);
   }
@@ -432,6 +437,8 @@ export class Penguin extends Container {
     this.transition = undefined;
     gsap.killTweensOf(this);
     gsap.killTweensOf(this.sprite);
+    this.overlayLayer.detach(this.balloon);
+    if (this.nameLabel) this.overlayLayer.detach(this.nameLabel);
     super.destroy(options);
   }
 }

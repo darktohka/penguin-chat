@@ -1,4 +1,11 @@
-import { Container, Graphics, Sprite, Text, type Spritesheet } from "pixi.js";
+import {
+  Container,
+  Graphics,
+  RenderLayer,
+  Sprite,
+  Text,
+  type Spritesheet,
+} from "pixi.js";
 import { gsap } from "gsap/gsap-core";
 import {
   CHAT_INPUT_HEIGHT,
@@ -65,6 +72,8 @@ export class World extends Container {
   private readonly backgroundLayer = new Container();
   private readonly playerLayer = new Container();
   private readonly foregroundLayer = new Container();
+  /** Top-most layer: penguin name labels and speech balloons render here. */
+  private readonly overlayLayer = new RenderLayer();
   private readonly logContainer = new Container();
   private readonly toolbar = new Container();
   private readonly logLines: string[] = [];
@@ -113,6 +122,7 @@ export class World extends Container {
     this.buildWorld(room);
     this.buildChatLog();
     this.buildToolbar(container);
+    this.addChild(this.overlayLayer);
     this.bindSocket();
 
     for (const player of join.players) {
@@ -411,6 +421,7 @@ export class World extends Container {
       x,
       y,
       this.spritesheet,
+      this.overlayLayer,
       isLocal,
     );
     this.players.set(id, penguin);

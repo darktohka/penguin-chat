@@ -14,7 +14,7 @@ export function playPop(): void {
   if (!template) {
     template = new Audio(ASSET_POP_SOUND);
     template.preload = "auto";
-    template.volume = 0.5;
+    template.volume = 0.1;
   }
   const sound = template.cloneNode() as HTMLAudioElement;
   sound.volume = template.volume;
