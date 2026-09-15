@@ -12,11 +12,15 @@ const modules = import.meta.glob("./snowcat/*.svg", {
   import: "default",
 }) as Record<string, string>;
 
-/** Shape id (the SWF `DefineShape` id, e.g. `123`) to its SVG source text. */
-export const SNOWCAT_SHAPE_SVGS: Readonly<Record<number, string>> =
+/**
+ * Shape name (`direction`-`top`/`bottom-N`, e.g. `north-top`) to its SVG source
+ * text. The filename encodes which part of the snowcat it is: each direction has
+ * a static `top` (body) and two alternating `bottom` (underside) walk poses.
+ */
+export const SNOWCAT_SHAPE_SVGS: Readonly<Record<string, string>> =
   Object.fromEntries(
     Object.entries(modules).map(([path, svg]) => [
-      Number(path.slice(path.lastIndexOf("/") + 1, -".svg".length)),
+      path.slice(path.lastIndexOf("/") + 1, -".svg".length),
       svg,
     ]),
   );

@@ -8,6 +8,7 @@ import {
   SNOWCAT_SCALE,
   SNOWCAT_SHAPES,
   SNOWCAT_WALK_STEP_SECONDS,
+  type SnowcatShapeName,
 } from "../core/constants";
 import type { SvgAsset } from "../pixi/assets";
 import { Character } from "./Character";
@@ -21,13 +22,13 @@ type Delayed = ReturnType<typeof gsap.delayedCall>;
  * `DefineSprite_138`); directions 6-8 reuse 4-2 mirrored.
  */
 export class Snowcat extends Character {
-  private readonly shapes: ReadonlyMap<number, SvgAsset>;
+  private readonly shapes: ReadonlyMap<string, SvgAsset>;
   private readonly composite = new Container();
   private readonly art = new Container();
   private readonly lower = new Graphics();
   private readonly upper = new Graphics();
 
-  private lowerIds: readonly [number, number] =
+  private lowerNames: readonly [SnowcatShapeName, SnowcatShapeName] =
     SNOWCAT_POSES[PENGUIN_DEFAULT_DIRECTION].lower;
   private lowerPose = 0;
   private walkTimer: Delayed | undefined;
@@ -37,7 +38,7 @@ export class Snowcat extends Character {
     displayName: string,
     x: number,
     y: number,
-    shapes: ReadonlyMap<number, SvgAsset>,
+    shapes: ReadonlyMap<string, SvgAsset>,
     overlayLayer: RenderLayer,
     isLocal = false,
   ) {
@@ -86,7 +87,7 @@ export class Snowcat extends Character {
   /** Lay out one direction: mirror if needed, then place the static upper. */
   private applyDirection(direction: number): void {
     const pose = SNOWCAT_POSES[direction] ?? SNOWCAT_POSES[PENGUIN_DEFAULT_DIRECTION];
-    this.lowerIds = pose.lower;
+    this.lowerNames = pose.lower;
     this.lowerPose = 0;
     this.applyLowerPose();
 
@@ -99,14 +100,14 @@ export class Snowcat extends Character {
   }
 
   private applyLowerPose(): void {
-    this.place(this.lower, this.lowerIds[this.lowerPose]);
+    this.place(this.lower, this.lowerNames[this.lowerPose]);
   }
 
-  /** Point `graphics` at `id`, pivoted so the shape's SWF origin sits at (0,0). */
-  private place(graphics: Graphics, id: number): void {
-    const asset = this.shapes.get(id);
-    const shape = SNOWCAT_SHAPES[id];
-    if (!asset || !shape) throw new Error(`Missing snowcat shape ${id}`);
+  /** Point `graphics` at `name`, pivoted so the shape's SWF origin sits at (0,0). */
+  private place(graphics: Graphics, name: SnowcatShapeName): void {
+    const asset = this.shapes.get(name);
+    const shape = SNOWCAT_SHAPES[name];
+    if (!asset || !shape) throw new Error(`Missing snowcat shape ${name}`);
     graphics.context = asset.context;
     graphics.pivot.set(shape.origin[0], shape.origin[1]);
   }

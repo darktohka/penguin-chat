@@ -169,27 +169,30 @@ export const SNOWCAT_NAME_TEXT_OFFSET_Y = 48;
  * so every shape lines up on the character origin, exactly as the SWF places
  * them at `(0,0)`. Using the SVG's own size keeps the maths independent of how
  * Pixi rasterises the SVG.
+ *
+ * Keys match the SVG filenames under `assets/snowcat/`: the compass direction
+ * plus `top` (the static body) or `bottom-N` (an underside walk pose).
  */
-export const SNOWCAT_SHAPES: Record<
-  number,
-  { readonly origin: readonly [number, number]; readonly size: readonly [number, number] }
-> = {
-  118: { origin: [74.7, 46.35], size: [149.45, 138.85] },
-  119: { origin: [40.55, 92.35], size: [97.95, 150.2] },
-  120: { origin: [72.8, 48.4], size: [145.65, 141.85] },
-  122: { origin: [72.2, 56.7], size: [144.45, 142.5] },
-  123: { origin: [36.45, 81.55], size: [94.35, 122.45] },
-  124: { origin: [99.65, 68.4], size: [199.3, 170.3] },
-  125: { origin: [72.0, 101.2], size: [158.0, 153.55] },
-  126: { origin: [83.35, 36.9], size: [166.5, 127.85] },
-  127: { origin: [65.5, 90.9], size: [146.0, 140.0] },
-  128: { origin: [99.65, 57.85], size: [199.3, 165.35] },
-  129: { origin: [72.65, 107.5], size: [157.1, 160.0] },
-  130: { origin: [72.1, 56.55], size: [144.2, 140.6] },
-  132: { origin: [100.0, 70.0], size: [200.0, 170.35] },
-  134: { origin: [82.4, 29.7], size: [164.45, 121.4] },
-  136: { origin: [101.25, 52.7], size: [202.5, 159.2] },
-};
+export const SNOWCAT_SHAPES = {
+  "north-top": { origin: [36.45, 81.55], size: [94.35, 122.45] },
+  "north-bottom-1": { origin: [72.2, 56.7], size: [144.45, 142.5] },
+  "north-bottom-2": { origin: [72.1, 56.55], size: [144.2, 140.6] },
+  "northeast-top": { origin: [72.0, 101.2], size: [158.0, 153.55] },
+  "northeast-bottom-1": { origin: [99.65, 68.4], size: [199.3, 170.3] },
+  "northeast-bottom-2": { origin: [100.0, 70.0], size: [200.0, 170.35] },
+  "east-top": { origin: [65.5, 90.9], size: [146.0, 140.0] },
+  "east-bottom-1": { origin: [83.35, 36.9], size: [166.5, 127.85] },
+  "east-bottom-2": { origin: [82.4, 29.7], size: [164.45, 121.4] },
+  "southeast-top": { origin: [72.65, 107.5], size: [157.1, 160.0] },
+  "southeast-bottom-1": { origin: [99.65, 57.85], size: [199.3, 165.35] },
+  "southeast-bottom-2": { origin: [101.25, 52.7], size: [202.5, 159.2] },
+  "south-top": { origin: [40.55, 92.35], size: [97.95, 150.2] },
+  "south-bottom-1": { origin: [74.7, 46.35], size: [149.45, 138.85] },
+  "south-bottom-2": { origin: [72.8, 48.4], size: [145.65, 141.85] },
+} as const;
+
+/** Every snowcat shape name, derived from `SNOWCAT_SHAPES`. */
+export type SnowcatShapeName = keyof typeof SNOWCAT_SHAPES;
 
 /**
  * One snowcat direction: the never-animated `upper` shape plus the two `lower`
@@ -198,8 +201,8 @@ export const SNOWCAT_SHAPES: Record<
  * with a negated `scaleX`).
  */
 export interface SnowcatPose {
-  readonly upper: number;
-  readonly lower: readonly [number, number];
+  readonly upper: SnowcatShapeName;
+  readonly lower: readonly [SnowcatShapeName, SnowcatShapeName];
   readonly mirror: boolean;
 }
 
@@ -211,14 +214,54 @@ export interface SnowcatPose {
  * 14/13/12 with `scaleX = -1`).
  */
 export const SNOWCAT_POSES: readonly SnowcatPose[] = [
-  { upper: 123, lower: [122, 130], mirror: false }, // 0 N  (frame 11)
-  { upper: 125, lower: [124, 132], mirror: false }, // 1 NE (frame 12)
-  { upper: 127, lower: [126, 134], mirror: false }, // 2 E  (frame 13)
-  { upper: 129, lower: [128, 136], mirror: false }, // 3 SE (frame 14)
-  { upper: 119, lower: [118, 120], mirror: false }, // 4 S  (frame 15)
-  { upper: 129, lower: [128, 136], mirror: true }, //  5 SW (frame 18)
-  { upper: 127, lower: [126, 134], mirror: true }, //  6 W  (frame 17)
-  { upper: 125, lower: [124, 132], mirror: true }, //  7 NW (frame 16)
+  // 0 N (frame 11)
+  {
+    upper: "north-top",
+    lower: ["north-bottom-1", "north-bottom-2"],
+    mirror: false,
+  },
+  // 1 NE (frame 12)
+  {
+    upper: "northeast-top",
+    lower: ["northeast-bottom-1", "northeast-bottom-2"],
+    mirror: false,
+  },
+  // 2 E (frame 13)
+  {
+    upper: "east-top",
+    lower: ["east-bottom-1", "east-bottom-2"],
+    mirror: false,
+  },
+  // 3 SE (frame 14)
+  {
+    upper: "southeast-top",
+    lower: ["southeast-bottom-1", "southeast-bottom-2"],
+    mirror: false,
+  },
+  // 4 S (frame 15)
+  {
+    upper: "south-top",
+    lower: ["south-bottom-1", "south-bottom-2"],
+    mirror: false,
+  },
+  // 5 SW (frame 18): SE mirrored
+  {
+    upper: "southeast-top",
+    lower: ["southeast-bottom-1", "southeast-bottom-2"],
+    mirror: true,
+  },
+  // 6 W (frame 17): E mirrored
+  {
+    upper: "east-top",
+    lower: ["east-bottom-1", "east-bottom-2"],
+    mirror: true,
+  },
+  // 7 NW (frame 16): NE mirrored
+  {
+    upper: "northeast-top",
+    lower: ["northeast-bottom-1", "northeast-bottom-2"],
+    mirror: true,
+  },
 ];
 
 /* Speech balloon ----------------------------------------------------------- */
@@ -333,7 +376,7 @@ export const ICON_HOVER_FILL_EXTENDED = 0xff0000;
 /* Audio (extended) --------------------------------------------------------- */
 
 /** SWF sound 111; played when a penguin enters or leaves the world. */
-export const ASSET_POP_SOUND = "sounds/111.wav";
+export const ASSET_POP_SOUND = "sounds/join.ogg";
 
 /** Chime played when the north pole snowcat flag is switched on. */
 export const ASSET_SNOWCAT_ON_SOUND = "sounds/snowcat-on.ogg";

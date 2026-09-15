@@ -94,18 +94,18 @@ export async function loadChrome(): Promise<{
 }
 
 /**
- * Load every snowcat shape as a vector context, keyed by its SWF shape id.
+ * Load every snowcat shape as a vector context, keyed by its shape name (e.g.
+ * `north-top`).
  *
  * The shape SVGs are bundled into the JS at build time (`SNOWCAT_SHAPE_SVGS`),
  * so each is loaded as an inline `data:` URI: no per-shape HTTP requests. Pixi
  * caches each under a stable alias, so reloading is free once decoded.
  */
-export async function loadSnowcatShapes(): Promise<Map<number, SvgAsset>> {
+export async function loadSnowcatShapes(): Promise<Map<string, SvgAsset>> {
   const entries = await Promise.all(
-    Object.entries(SNOWCAT_SHAPE_SVGS).map(async ([key, svg]) => {
-      const id = Number(key);
-      const asset = await loadSvgAsset(`snowcat:${id}`, svg);
-      return [id, asset] as const;
+    Object.entries(SNOWCAT_SHAPE_SVGS).map(async ([name, svg]) => {
+      const asset = await loadSvgAsset(`snowcat:${name}`, svg);
+      return [name, asset] as const;
     }),
   );
   return new Map(entries);

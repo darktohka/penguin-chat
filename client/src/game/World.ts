@@ -97,7 +97,7 @@ export class World extends Container {
     Character,
     ReturnType<typeof gsap.timeline>
   >();
-  private snowcatShapes: ReadonlyMap<number, SvgAsset> | undefined;
+  private snowcatShapes: ReadonlyMap<string, SvgAsset> | undefined;
   private snowcatChimePlaying = false;
 
   private chatInput!: HTMLInputElement;
