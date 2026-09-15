@@ -2,6 +2,10 @@ import { Assets, Sprite, Texture, type Spritesheet } from "pixi.js";
 import {
   ASSET_LOADING,
   ASSET_ROCKETSNAIL,
+  ASSET_ROOM_BOBCAT_LAYER2,
+  ASSET_ROOM_CRASHED_BOBCAT,
+  ASSET_ROOM_NORTHPOLE,
+  ASSET_ROOM_WAVE,
   ASSET_SHEET,
   ASSET_TITLE,
   ICON_SOURCES,
@@ -64,4 +68,48 @@ export function walkFrames(
   return (
     sheet.animations[`move${direction}`] ?? sheet.animations[`move${fallback}`]
   );
+}
+
+/** Textures needed to render a room's art, discriminated by resolved id. */
+export type RoomAssets =
+  | { readonly roomId: "penguin1" }
+  | { readonly roomId: "northpole"; readonly northpole: Texture }
+  | {
+      readonly roomId: "crashsite";
+      readonly crashedBobcat: Texture;
+      readonly wave: Texture;
+      readonly bobcatLayer2: Texture;
+    };
+
+/**
+ * Load the SVG textures used by a room's background/foreground art. PIXI caches
+ * each texture under a stable alias, so revisiting a room does not refetch it;
+ * an unknown room id falls back to the plain Snow Room (`penguin1`).
+ */
+export async function loadRoomAssets(roomId: string): Promise<RoomAssets> {
+  switch (roomId) {
+    case "northpole": {
+      const northpole = await Assets.load<Texture>({
+        alias: "room:northpole",
+        src: ASSET_ROOM_NORTHPOLE,
+      });
+      return { roomId: "northpole", northpole };
+    }
+    case "crashsite": {
+      const [crashedBobcat, wave, bobcatLayer2] = await Promise.all([
+        Assets.load<Texture>({
+          alias: "room:crashedbobcat",
+          src: ASSET_ROOM_CRASHED_BOBCAT,
+        }),
+        Assets.load<Texture>({ alias: "room:wave", src: ASSET_ROOM_WAVE }),
+        Assets.load<Texture>({
+          alias: "room:bobcatlayer2",
+          src: ASSET_ROOM_BOBCAT_LAYER2,
+        }),
+      ]);
+      return { roomId: "crashsite", crashedBobcat, wave, bobcatLayer2 };
+    }
+    default:
+      return { roomId: "penguin1" };
+  }
 }

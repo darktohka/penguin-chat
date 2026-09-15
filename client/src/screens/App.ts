@@ -1,10 +1,16 @@
 import type { Application, Container } from "pixi.js";
-import { CONNECT_DELAY_MS, GAME_ID, ROOM_ID } from "../core/constants";
+import {
+  CONNECT_DELAY_MS,
+  DEFAULT_ROOM_ID,
+  EXTENDED,
+  GAME_ID,
+} from "../core/constants";
 import { defaultSocketUrl } from "../net/Socket";
 import { GameClient, type GameEvents } from "../net/GameClient";
 import { loadIcons, loadSpritesheet } from "../pixi/assets";
 import { World } from "../game/World";
 import { EndScreen } from "./EndScreen";
+import { SetupScreen } from "./SetupScreen";
 import { StartScreen } from "./StartScreen";
 import { StatusScreen } from "./StatusScreen";
 
@@ -55,7 +61,11 @@ export class App {
   ) {}
 
   async start(): Promise<void> {
-    await this.showStart();
+    await this.goHome();
+  }
+
+  private goHome(): Promise<void> {
+    return EXTENDED ? this.showSetup() : this.showStart();
   }
 
   private setScreen(screen: Container): void {
@@ -78,7 +88,14 @@ export class App {
   private async showStart(): Promise<void> {
     this.teardownSocket();
     const screen = new StartScreen();
-    screen.onPlay = () => void this.play();
+    screen.onPlay = () => void this.play(undefined, DEFAULT_ROOM_ID);
+    await screen.init();
+    this.setScreen(screen);
+  }
+
+  private async showSetup(): Promise<void> {
+    const screen = new SetupScreen(this.container);
+    screen.onNext = (username, roomId) => void this.play(username, roomId);
     await screen.init();
     this.setScreen(screen);
   }
@@ -92,7 +109,7 @@ export class App {
   private async showEnd(message: string): Promise<void> {
     this.teardownSocket();
     const screen = new EndScreen(message);
-    screen.onTryAgain = () => void this.showStart();
+    screen.onTryAgain = () => void this.goHome();
     await screen.init();
     this.setScreen(screen);
   }
@@ -107,7 +124,10 @@ export class App {
     );
   }
 
-  private async play(): Promise<void> {
+  private async play(
+    username: string | undefined,
+    roomId: string,
+  ): Promise<void> {
     await this.showStatus("Connecting to Server");
 
     const client = new GameClient({ url: defaultSocketUrl(), game: GAME_ID });
@@ -121,12 +141,12 @@ export class App {
     try {
       const loggedIn = once(client, "loggedIn");
       await Promise.all([client.connect(), delay(CONNECT_DELAY_MS)]);
-      client.guest();
+      client.guest(username);
       await loggedIn;
       await this.showStatus("Loading World");
 
       const joined = once(client, "joined");
-      client.join(ROOM_ID);
+      client.join(roomId);
       const [joinPayload, spritesheet] = await Promise.all([
         joined,
         loadSpritesheet(),
@@ -139,7 +159,7 @@ export class App {
         this.teardownSocket();
         void this.showLoggedOff();
       };
-      world.init(this.container, joinPayload);
+      await world.init(this.container, joinPayload);
       this.setScreen(world);
     } catch (error) {
       if (this.socket === client) {

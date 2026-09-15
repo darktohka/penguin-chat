@@ -1,4 +1,4 @@
-import { Container, Graphics, Text, type Spritesheet } from "pixi.js";
+import { Container, Graphics, Sprite, Text, type Spritesheet } from "pixi.js";
 import { gsap } from "gsap/gsap-core";
 import {
   CHAT_INPUT_HEIGHT,
@@ -28,11 +28,17 @@ import {
   LOG_X,
   LOG_Y,
   LOG_BUTTON_POS,
+  NORTHPOLE_ORIGIN,
+  NORTHPOLE_SVG_OFFSET,
   SEND_BUTTON_POS,
   TOOLBAR_Y,
+  WAVE_BOB_SECONDS,
+  WAVE_FRAME_A,
+  WAVE_FRAME_B,
 } from "../core/constants";
 import type { GameClient, GameEvents } from "../net/GameClient";
 import { playPop } from "../audio/sfx";
+import { loadRoomAssets, type RoomAssets } from "../pixi/assets";
 import { IconButton, type IconHelp } from "../pixi/IconButton";
 import { Penguin } from "./Penguin";
 
@@ -52,7 +58,9 @@ export class World extends Container {
   private readonly socket: GameClient;
   private readonly spritesheet: Spritesheet;
   private readonly players = new Map<string, Penguin>();
+  private readonly backgroundLayer = new Container();
   private readonly playerLayer = new Container();
+  private readonly foregroundLayer = new Container();
   private readonly logContainer = new Container();
   private readonly toolbar = new Container();
   private readonly logLines: string[] = [];
@@ -67,6 +75,8 @@ export class World extends Container {
   private sendButton!: IconButton;
   private helpLabel: Text | undefined;
   private chatCooldownTimer: ReturnType<typeof gsap.delayedCall> | undefined;
+  private waveTimer: ReturnType<typeof gsap.delayedCall> | undefined;
+  private waveOnSecondFrame = false;
   private margin = 0;
   private unsubscribers: Array<() => void> = [];
 
@@ -86,9 +96,10 @@ export class World extends Container {
   }
 
   /** Build the scene and subscribe to the room. */
-  init(container: HTMLElement, join: JoinPayload): void {
+  async init(container: HTMLElement, join: JoinPayload): Promise<void> {
     this.margin = (join.room.margin as number | undefined) ?? 0;
-    this.buildWorld();
+    const room = await loadRoomAssets(join.roomId);
+    this.buildWorld(room);
     this.buildChatLog();
     this.buildToolbar(container);
     this.bindSocket();
@@ -110,7 +121,7 @@ export class World extends Container {
     document.addEventListener("visibilitychange", this.visibilityHandler);
   }
 
-  private buildWorld(): void {
+  private buildWorld(room: RoomAssets): void {
     const backdrop = new Graphics();
     backdrop.rect(0, 0, GAME_WIDTH, GAME_HEIGHT);
     backdrop.fill(0xffffff);
@@ -131,7 +142,59 @@ export class World extends Container {
       this.socket.move(targetX, targetY);
     });
 
-    this.addChild(backdrop, this.playerLayer);
+    this.addChild(
+      backdrop,
+      this.backgroundLayer,
+      this.playerLayer,
+      this.foregroundLayer,
+    );
+    this.buildRoomArt(room);
+  }
+
+  private buildRoomArt(room: RoomAssets): void {
+    switch (room.roomId) {
+      case "penguin1":
+        return;
+      case "northpole": {
+        const shape = new Sprite(room.northpole);
+        shape.position.set(
+          NORTHPOLE_ORIGIN.x - NORTHPOLE_SVG_OFFSET.x,
+          NORTHPOLE_ORIGIN.y - NORTHPOLE_SVG_OFFSET.y,
+        );
+        this.backgroundLayer.addChild(shape);
+        return;
+      }
+      case "crashsite": {
+        const background = new Sprite(room.crashedBobcat);
+        background.position.set(0, GAME_HEIGHT - background.height);
+        this.backgroundLayer.addChild(background);
+
+        const wave = new Sprite(room.wave);
+        wave.anchor.set(0.5);
+        wave.position.set(WAVE_FRAME_A.x, WAVE_FRAME_A.y);
+        this.backgroundLayer.addChild(wave);
+        this.startWaveBob(wave);
+
+        const foreground = new Sprite(room.bobcatLayer2);
+        foreground.position.set(0, GAME_HEIGHT - foreground.height);
+        this.foregroundLayer.addChild(foreground);
+        return;
+      }
+      default: {
+        const exhaustive: never = room;
+        throw new Error(`Unhandled room art: ${JSON.stringify(exhaustive)}`);
+      }
+    }
+  }
+
+  private startWaveBob(wave: Sprite): void {
+    const bob = (): void => {
+      this.waveOnSecondFrame = !this.waveOnSecondFrame;
+      const frame = this.waveOnSecondFrame ? WAVE_FRAME_B : WAVE_FRAME_A;
+      wave.position.set(frame.x, frame.y);
+      this.waveTimer = gsap.delayedCall(WAVE_BOB_SECONDS, bob);
+    };
+    this.waveTimer = gsap.delayedCall(WAVE_BOB_SECONDS, bob);
   }
 
   private buildChatLog(): void {
@@ -395,6 +458,8 @@ export class World extends Container {
     document.removeEventListener("visibilitychange", this.visibilityHandler);
     this.chatCooldownTimer?.kill();
     this.chatCooldownTimer = undefined;
+    this.waveTimer?.kill();
+    this.waveTimer = undefined;
     this.chatInput?.remove();
 
     for (const unsubscribe of this.unsubscribers) unsubscribe();

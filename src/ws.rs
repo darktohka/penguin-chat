@@ -20,7 +20,18 @@ use crate::AppState;
 static NEXT_CONNECTION: AtomicU64 = AtomicU64::new(1);
 static NEXT_PLAYER: AtomicU64 = AtomicU64::new(1);
 
-const ROOM: &str = "penguin1";
+/// The available rooms as `(wire id, display name)`. Index 0 is the default
+/// room, and `penguin1` keeps its original id so a pre-multi-room client that
+/// sends no `room` field still lands in the room it has always known.
+const ROOMS: [(&str, &str); 3] = [
+    ("penguin1", "Snow Room"),
+    ("northpole", "North Pole"),
+    ("crashsite", "Crash Site"),
+];
+
+/// Room every connection starts in, and the fallback for absent/unknown requests.
+const DEFAULT_ROOM: &str = "penguin1";
+
 const WORLD_WIDTH: f64 = 600.0;
 const WORLD_HEIGHT: f64 = 400.0;
 
@@ -29,6 +40,10 @@ const CRITTER_TYPE: &str = "default";
 
 /// Guest nickname assigned to every anonymous player, as the original does.
 const NICKNAME: &str = "Guest";
+
+/// Maximum nickname length in UTF-16 code units, matching the client's
+/// JavaScript `String.length`; longer names are truncated on a char boundary.
+const MAX_NICKNAME: usize = 14;
 
 /// Extended server variant: include a top-level `nickname` in room snapshots so
 /// the client can label penguins without reading `critter.nickname`.
@@ -103,69 +118,96 @@ pub struct PlayerSnapshot {
 struct Player {
     x: f64,
     y: f64,
+    /// The nickname chosen at login; snapshots and announcements read it so each
+    /// player is labelled with its own name rather than a global default.
+    nickname: String,
     tx: mpsc::Sender<Message>,
 }
 
-/// Single global room holding every connected player.
+/// Per-room player maps: room id → (player id → player). Every mutation and
+/// broadcast is scoped to exactly one outer key, which is what keeps rooms
+/// isolated from one another.
+type Rooms = HashMap<&'static str, HashMap<String, Player>>;
+
+/// Room-keyed registry holding every joined player.
 pub struct Hub {
-    players: Mutex<HashMap<String, Player>>,
+    rooms: Mutex<Rooms>,
 }
 
 impl Hub {
     pub fn new() -> Self {
         Self {
-            players: Mutex::new(HashMap::new()),
+            rooms: Mutex::new(HashMap::new()),
         }
     }
 
-    /// Lock the player map, recovering from a poisoned lock rather than panicking.
-    fn players(&self) -> MutexGuard<'_, HashMap<String, Player>> {
-        self.players.lock().unwrap_or_else(|poison| poison.into_inner())
+    /// Lock the room map, recovering from a poisoned lock rather than panicking.
+    fn rooms(&self) -> MutexGuard<'_, Rooms> {
+        self.rooms.lock().unwrap_or_else(|poison| poison.into_inner())
     }
 
-    fn insert(&self, id: String, x: f64, y: f64, tx: mpsc::Sender<Message>) {
-        self.players().insert(id, Player { x, y, tx });
+    fn insert(&self, room: &'static str, id: String, player: Player) {
+        self.rooms().entry(room).or_default().insert(id, player);
     }
 
-    fn remove(&self, id: &str) -> bool {
-        self.players().remove(id).is_some()
+    fn remove(&self, room: &'static str, id: &str) -> bool {
+        self.rooms()
+            .get_mut(room)
+            .is_some_and(|players| players.remove(id).is_some())
     }
 
-    /// Snapshots of every player in the room, including the joiner itself.
+    /// Snapshots of every player in `room`, including the joiner itself.
     ///
     /// The client renders its own penguin solely from the `join` payload's
     /// `players` array (it never adds the local player separately), so the
     /// joiner must be present here or the local sprite would never appear.
-    fn room_players(&self) -> Vec<PlayerSnapshot> {
-        self.players()
-            .iter()
-            .map(|(id, player)| PlayerSnapshot {
-                id: id.clone(),
-                nickname: EXTENDED.then(|| NICKNAME.to_owned()),
-                x: player.x,
-                y: player.y,
-                critter: Critter::guest(NICKNAME),
+    fn room_players(&self, room: &'static str) -> Vec<PlayerSnapshot> {
+        self.rooms()
+            .get(room)
+            .map(|players| {
+                players
+                    .iter()
+                    .map(|(id, player)| PlayerSnapshot {
+                        id: id.clone(),
+                        nickname: EXTENDED.then(|| player.nickname.clone()),
+                        x: player.x,
+                        y: player.y,
+                        critter: Critter::guest(&player.nickname),
+                    })
+                    .collect()
             })
-            .collect()
+            .unwrap_or_default()
     }
 
-    /// Outbound channels of everyone except `id`.
-    fn channels_except(&self, id: &str) -> Vec<mpsc::Sender<Message>> {
-        self.players()
-            .iter()
-            .filter(|(other, _)| other.as_str() != id)
-            .map(|(_, player)| player.tx.clone())
-            .collect()
+    /// Outbound channels of everyone in `room` except `id`.
+    fn channels_except(&self, room: &'static str, id: &str) -> Vec<mpsc::Sender<Message>> {
+        self.rooms()
+            .get(room)
+            .map(|players| {
+                players
+                    .iter()
+                    .filter(|(other, _)| other.as_str() != id)
+                    .map(|(_, player)| player.tx.clone())
+                    .collect()
+            })
+            .unwrap_or_default()
     }
 
-    /// Outbound channels of everyone including `id`.
-    fn channels_all(&self) -> Vec<mpsc::Sender<Message>> {
-        self.players().values().map(|player| player.tx.clone()).collect()
+    /// Outbound channels of everyone in `room`, including `id`.
+    fn channels_all(&self, room: &'static str) -> Vec<mpsc::Sender<Message>> {
+        self.rooms()
+            .get(room)
+            .map(|players| players.values().map(|player| player.tx.clone()).collect())
+            .unwrap_or_default()
     }
 
-    /// Persist a validated position; returns whether the player exists.
-    fn set_position(&self, id: &str, x: f64, y: f64) -> bool {
-        match self.players().get_mut(id) {
+    /// Persist a validated position within `room`; returns whether the player exists.
+    fn set_position(&self, room: &'static str, id: &str, x: f64, y: f64) -> bool {
+        match self
+            .rooms()
+            .get_mut(room)
+            .and_then(|players| players.get_mut(id))
+        {
             Some(player) => {
                 player.x = x;
                 player.y = y;
@@ -232,6 +274,10 @@ struct Connection {
     hub: Arc<Hub>,
     tx: mpsc::Sender<Message>,
     player_id: Option<String>,
+    /// Resolved room for this connection, set from the `join` frame.
+    room: &'static str,
+    /// Sanitised nickname chosen at login, used for every announcement.
+    nickname: String,
     x: f64,
     y: f64,
     joined: bool,
@@ -258,7 +304,7 @@ impl Connection {
         };
         match value.get("type").and_then(Value::as_str) {
             Some("guest") | Some("verify") => self.handle_login(&value),
-            Some("join") => self.handle_join(),
+            Some("join") => self.handle_join(&value),
             Some("move") => self.handle_move(&value),
             Some("chat") => self.handle_chat(&value),
             Some("emote") => self.handle_emote(&value),
@@ -295,6 +341,10 @@ impl Connection {
             }));
         }
 
+        // `guest`/`verify` may carry an optional `nickname`; sanitise it once here
+        // so login, the join snapshot, and announcements all agree on the name.
+        self.nickname = resolve_nickname(value.get("nickname").and_then(Value::as_str));
+
         let id = self.player_id.get_or_insert_with(new_player_id).clone();
         let (x, y) = random_spawn();
         self.x = x;
@@ -305,8 +355,8 @@ impl Connection {
             "data": {
                 "id": id,
                 "username": id,
-                "nickname": NICKNAME,
-                "critter": Critter::guest(NICKNAME),
+                "nickname": &self.nickname,
+                "critter": Critter::guest(&self.nickname),
                 "roles": [ROLE_GUEST],
                 "limits": {
                     "move": {
@@ -322,29 +372,41 @@ impl Connection {
         tracing::info!(
             connection = %self.conn,
             player = %id,
-            nickname = NICKNAME,
-            room = ROOM,
+            nickname = %self.nickname,
+            room = self.room,
             ip = %self.client.ip,
             user_agent = self.client.user_agent.as_deref().unwrap_or("-"),
             "penguin logged in"
         );
     }
 
-    /// `join`: register in the hub, deliver the room state, announce to others.
-    fn handle_join(&mut self) {
+    /// `join`: register in the resolved room, deliver its state, announce to peers.
+    fn handle_join(&mut self, value: &Value) {
         let Some(id) = self.player_id.clone() else {
             tracing::warn!(connection = %self.conn, "join before login ignored");
             return;
         };
 
-        self.hub.insert(id.clone(), self.x, self.y, self.tx.clone());
+        let room = resolve_room(value.get("room").and_then(Value::as_str));
+        self.room = room;
+
+        self.hub.insert(
+            room,
+            id.clone(),
+            Player {
+                x: self.x,
+                y: self.y,
+                nickname: self.nickname.clone(),
+                tx: self.tx.clone(),
+            },
+        );
         self.joined = true;
 
-        let players = self.hub.room_players();
+        let players = self.hub.room_players(room);
         self.send(json!({
             "type": "join",
             "data": {
-                "type": ROOM,
+                "type": room,
                 "id": id,
                 "players": players,
                 "width": WORLD_WIDTH,
@@ -360,14 +422,14 @@ impl Connection {
         let announcement = json!({
             "type": "A",
             "i": id,
-            "n": NICKNAME,
+            "n": &self.nickname,
             "x": self.x,
             "y": self.y,
             "c": { "t": CRITTER_TYPE, "o": {} },
         });
-        broadcast(&self.hub.channels_except(&id), announcement);
+        broadcast(&self.hub.channels_except(room, &id), announcement);
 
-        tracing::info!(player = %id, nickname = NICKNAME, room = ROOM, "penguin joined");
+        tracing::info!(player = %id, nickname = %self.nickname, room = room, "penguin joined");
     }
 
     /// `move`: enforce `minDistance`, clamp to the world, then echo `X` to all.
@@ -400,13 +462,13 @@ impl Connection {
         self.x = x;
         self.y = y;
 
-        if !self.hub.set_position(&id, x, y) {
+        if !self.hub.set_position(self.room, &id, x, y) {
             return;
         }
 
         tracing::debug!(player = %id, x, y, "move");
         let payload = json!({ "type": "X", "i": id, "x": x, "y": y });
-        broadcast(&self.hub.channels_all(), payload);
+        broadcast(&self.hub.channels_all(self.room), payload);
     }
 
     /// `chat`: enforce length and cooldown, then echo `C` to the whole room.
@@ -432,9 +494,9 @@ impl Connection {
             return;
         }
 
-        tracing::info!(player = %id, nickname = NICKNAME, message = %message, "chat");
+        tracing::info!(player = %id, nickname = %self.nickname, message = %message, "chat");
         let payload = json!({ "type": "C", "i": id, "m": message });
-        broadcast(&self.hub.channels_all(), payload);
+        broadcast(&self.hub.channels_all(self.room), payload);
     }
 
     /// `emote`: enforce length and cooldown, then echo `E` to the whole room.
@@ -460,9 +522,9 @@ impl Connection {
             return;
         }
 
-        tracing::info!(player = %id, nickname = NICKNAME, emote = %emote, "emote");
+        tracing::info!(player = %id, nickname = %self.nickname, emote = %emote, "emote");
         let payload = json!({ "type": "E", "i": id, "e": emote });
-        broadcast(&self.hub.channels_all(), payload);
+        broadcast(&self.hub.channels_all(self.room), payload);
     }
 
     /// `trigger`: emit a room-wide animation frame.
@@ -475,7 +537,7 @@ impl Connection {
 
         tracing::debug!(player = %id, "trigger");
         let payload = json!({ "type": "P", "t": id, "f": 0 });
-        broadcast(&self.hub.channels_all(), payload);
+        broadcast(&self.hub.channels_all(self.room), payload);
     }
 
     /// Remove the player (if joined) and notify the remaining peers.
@@ -485,12 +547,12 @@ impl Connection {
             return;
         };
 
-        if self.joined && self.hub.remove(&id) {
+        if self.joined && self.hub.remove(self.room, &id) {
             let payload = json!({ "type": "R", "i": id });
-            broadcast(&self.hub.channels_except(&id), payload);
+            broadcast(&self.hub.channels_except(self.room, &id), payload);
         }
 
-        tracing::info!(player = %id, nickname = NICKNAME, room = ROOM, reason, "penguin left");
+        tracing::info!(player = %id, nickname = %self.nickname, room = self.room, reason, "penguin left");
     }
 
     /// Serialise and enqueue a JSON frame for this connection.
@@ -516,6 +578,51 @@ fn send_json(tx: &mpsc::Sender<Message>, value: Value) {
 /// so the server's limit is neither stricter nor looser than the client's.
 fn utf16_len(value: &str) -> usize {
     value.chars().map(char::len_utf16).sum()
+}
+
+/// Resolve the room a `join` request targets, defaulting to the first room.
+///
+/// Absent, non-string, and unknown ids all fall back to `DEFAULT_ROOM`; with
+/// `EXTENDED` off every request resolves to it, preserving the pre-multi-room
+/// behavior byte-for-byte.
+fn resolve_room(requested: Option<&str>) -> &'static str {
+    if !EXTENDED {
+        return DEFAULT_ROOM;
+    }
+    requested
+        .and_then(|room| ROOMS.iter().map(|(id, _)| *id).find(|id| *id == room))
+        .unwrap_or(DEFAULT_ROOM)
+}
+
+/// Sanitise an optional client-supplied nickname into a display name.
+///
+/// The raw string is trimmed, stripped of control characters, then truncated to
+/// `MAX_NICKNAME` UTF-16 code units on a char boundary so a trailing surrogate
+/// pair is never split. Anything that sanitises to empty falls back to
+/// `NICKNAME`; with `EXTENDED` off every login uses `NICKNAME`.
+fn resolve_nickname(requested: Option<&str>) -> String {
+    if !EXTENDED {
+        return NICKNAME.to_owned();
+    }
+    let Some(raw) = requested else {
+        return NICKNAME.to_owned();
+    };
+    let cleaned: String = raw.trim().chars().filter(|ch| !ch.is_control()).collect();
+    let mut units = 0usize;
+    let mut end = 0usize;
+    for (index, ch) in cleaned.char_indices() {
+        let width = ch.len_utf16();
+        if units + width > MAX_NICKNAME {
+            break;
+        }
+        units += width;
+        end = index + ch.len_utf8();
+    }
+    if end == 0 {
+        NICKNAME.to_owned()
+    } else {
+        cleaned[..end].to_owned()
+    }
 }
 
 /// HTTP upgrade entry point for `GET /ws`.
@@ -570,6 +677,8 @@ async fn handle_socket(socket: WebSocket, state: AppState, conn: String, client:
         hub: Arc::clone(&state.hub),
         tx: tx.clone(),
         player_id: None,
+        room: DEFAULT_ROOM,
+        nickname: NICKNAME.to_owned(),
         x: 0.0,
         y: 0.0,
         joined: false,

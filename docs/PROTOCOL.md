@@ -16,12 +16,30 @@ socket URL.
   proxy for HTTPS).
 - **Encoding:** UTF-8 JSON. Unknown fields are ignored; unknown `type` values are
   logged and dropped without closing the connection.
-- **World:** one global room, `penguin1`, 600×400 units. Coordinates are clamped
+- **World:** three rooms sharing a single 600×400 coordinate space, each with its
+  own independent player set (see [Rooms](#rooms)). Coordinates are clamped
   server-side to `x ∈ [0, 600]`, `y ∈ [0, 400]`.
 
 Message direction is indicated per message. All server→client frames include a
 `type` discriminator. Short one-letter types (`A`, `R`, `X`, `C`, `E`, `P`) are
 used for the high-frequency in-room events.
+
+## Rooms
+
+Players are grouped into rooms. A room is chosen with the optional `room` field
+of the `join` request; each room keeps its own player set and its own broadcast
+scope, so a player only ever sees `A`/`R`/`X`/`C`/`E`/`P` frames from players in
+the same room.
+
+| Room id     | Display name | Notes                                   |
+| ----------- | ------------ | --------------------------------------- |
+| `penguin1`  | Snow Room    | Default / first room (used by old clients) |
+| `northpole` | North Pole   |                                         |
+| `crashsite` | Crash Site   |                                         |
+
+A `join` request with no `room` field, or with a room id the server does not
+recognise, is placed in the first (default) room, `penguin1`. This keeps old
+clients that only ever send `"room": "penguin1"` working unchanged.
 
 ## Server → Client
 
@@ -34,7 +52,9 @@ Sent immediately in response to the first `guest` (or `verify`) message.
   "type": "login",
   "data": {
     "id": "p1",
-    "critter": { "nickname": "Penguin" },
+    "username": "p1",
+    "nickname": "Tux",
+    "critter": { "nickname": "Tux" },
     "roles": [],
     "limits": {
       "move": { "minDistance": 4, "cooldown": 0 },
@@ -46,7 +66,10 @@ Sent immediately in response to the first `guest` (or `verify`) message.
 ```
 
 - `data.id` - stable per-connection player id (e.g. `p1`, `p2`).
-- `data.critter.nickname` / `data.roles` - critter and role metadata.
+- `data.username` - the player id (this server has no accounts).
+- `data.nickname` / `data.critter.nickname` - the display nickname chosen at
+  login (`"Guest"` when none was supplied). At most 14 characters.
+- `data.roles` - role metadata.
 - `data.limits` - client-side rate limits. `limits.move.minDistance` is the
   minimum pointer travel before a move is sent; `limits.chat.maxLength` and
   `limits.emote.maxLength` cap message length; `cooldown` is in milliseconds.
@@ -68,10 +91,10 @@ Sent once after the client's `join` request.
     "players": [
       {
         "id": "p1",
-        "nickname": "Penguin",
+        "nickname": "Tux",
         "x": 350,
         "y": 289,
-        "critter": { "nickname": "Penguin" }
+        "critter": { "nickname": "Tux" }
       }
     ],
     "navmesh": null,
@@ -82,11 +105,13 @@ Sent once after the client's `join` request.
 }
 ```
 
-- `data.type` is the room id (`penguin1`).
+- `data.type` is the **resolved** room id (see [Rooms](#rooms)). A request for an
+  unknown room resolves to `penguin1`.
 - `data.players` **includes the joining player itself.** The client renders its
   own penguin solely by iterating this array (`for (const p of data.players)
 addPlayer(...)`) and never adds the local player separately; omitting self
-  means the local sprite never appears.
+  means the local sprite never appears. Each entry's `nickname` is that player's
+  chosen display name.
 - `data.navmesh`, `data.triggers`, `data.props` are world metadata (unused in the
   flat `penguin1` room; `navmesh` is `null`).
 - `data.margin` is the pointer-safe margin for movement input.
@@ -99,7 +124,7 @@ Broadcast to everyone **except** the joiner when a player enters the room.
 {
   "type": "A",
   "i": "p2",
-  "n": "Penguin",
+  "n": "Tux",
   "x": 248,
   "y": 351,
   "c": { "t": "penguin1", "o": {} }
@@ -180,6 +205,9 @@ have `{ code, message }` and additionally fail the connection handshake.
 ```
 
 An optional `nickname` field may be supplied. The server replies with `login`.
+The nickname is trimmed, stripped of control characters and capped at 14
+characters; an absent, empty or all-whitespace nickname becomes `"Guest"`.
+Nicknames are not unique.
 
 ### `verify` - token login
 
@@ -198,7 +226,9 @@ preceded by an `info` frame.
 
 The server registers the player, replies with the `join` snapshot, and announces
 the player to others with `A`. A player who logs in but never sends `join` stays
-out of the room and is invisible to others.
+out of the room and is invisible to others. The `room` field selects the room
+(see [Rooms](#rooms)); omitting it - or naming an unknown room - joins the
+default room, `penguin1`. All subsequent broadcasts are scoped to that room.
 
 ### `move`
 
@@ -241,17 +271,19 @@ client                          server
   |◀──────────────── login ─────|
   |── join ────────────────────▶|
   |◀──────────────── join ──────|  (players includes self)
-  |                             |── A ──▶ other clients
-  |── move ────────────────────▶|── X ──▶ all (including sender)
-  |── chat ────────────────────▶|── C ──▶ all (including sender)
-  |── emote ───────────────────▶|── E ──▶ all (including sender)
-  |   (disconnect)              |── R ──▶ others
+  |                             |── A ──▶ others in room
+  |── move ────────────────────▶|── X ──▶ all in room (including sender)
+  |── chat ────────────────────▶|── C ──▶ all in room (including sender)
+  |── emote ───────────────────▶|── E ──▶ all in room (including sender)
+  |   (disconnect)              |── R ──▶ others in room
 ```
 
 Ordering guarantees and rules:
 
 - `login` is always sent before any `join` snapshot on the same connection.
 - A `join` snapshot lists players already in the room **and** the joiner.
+- Every room-scoped frame (`A`, `R`, `X`, `C`, `E`, `P`) only reaches players in
+  the sender's room.
 - A player is only added to the room on `join`, and only removed on disconnect
   if they had joined.
 - `chat`, `emote`, `move`, and `trigger` are ignored until the player has joined.

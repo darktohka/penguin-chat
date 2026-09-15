@@ -138,6 +138,73 @@ export const BALLOON_HOLD_SECONDS = 8;
 /** SWF-faithful extended client: name labels, hover help, red hover, pop audio. */
 export const EXTENDED = true;
 
+/* Rooms / pre-join setup (extended) ----------------------------------------- */
+
+/** Fallback nickname used when the name field is left blank. */
+export const DEFAULT_NICKNAME = "Guest";
+/** SWF name field `maxLength="14"`. */
+export const MAX_NICKNAME_LENGTH = 14;
+
+/** A selectable room: the server-resolved `id` plus its display `name`. */
+export interface RoomOption {
+  readonly id: string;
+  readonly name: string;
+}
+
+/** The three rooms offered on the pre-join screen (server-resolved ids). */
+export const ROOMS: readonly RoomOption[] = [
+  { id: "penguin1", name: "Snow Room" },
+  { id: "northpole", name: "North Pole" },
+  { id: "crashsite", name: "Crash Site" },
+];
+
+/** Room joined when the user does not pick one (Snow Room, the default). */
+export const DEFAULT_ROOM_ID = "penguin1";
+
+/**
+ * Two-line "Please enter a name / for your penguin?" prompt, centred on the
+ * canvas (the SWF text sits at the same spot with its lines centre-aligned).
+ */
+export const SETUP_PROMPT_TEXT = "Please enter a name\nfor your penguin?";
+export const SETUP_PROMPT_POS = { x: 300, y: 230 } as const;
+export const SETUP_PROMPT_FONT_SIZE = 13;
+export const SETUP_PROMPT_LINE_HEIGHT = 13.3;
+export const SETUP_INPUT_POS = { x: 215, y: 267 } as const;
+export const SETUP_INPUT_WIDTH = 170;
+export const SETUP_INPUT_HEIGHT = 22;
+/** Room radio group: circle-centre x, first row centre y, and row spacing. */
+export const SETUP_RADIO_X = 420;
+export const SETUP_RADIO_FIRST_Y = 245;
+export const SETUP_RADIO_GAP = 16;
+/** "Next" button, sitting a little below the name field. */
+export const SETUP_NEXT_BUTTON_POS = { x: 300, y: 315 } as const;
+
+/* Radio buttons (`RadioButton`, extended) ----------------------------------- */
+
+/** SWF room-selector circle: 12.8px diameter, `#ffffff` idle, `#febb00` selected. */
+export const RADIO_RADIUS = 6.4;
+export const RADIO_FILL = 0xffffff;
+export const RADIO_SELECTED_FILL = 0xfebb00;
+export const RADIO_STROKE = 0x000000;
+export const RADIO_STROKE_WIDTH = 1;
+export const RADIO_LABEL_GAP = 10;
+export const RADIO_LABEL_COLOR = 0x000000;
+export const RADIO_LABEL_FONT_SIZE = 11;
+
+/* Room backgrounds (extended) ----------------------------------------------- */
+
+/**
+ * World position of the northpole shape's local origin. The SVG wraps its art
+ * in a `(10.05, 10.4)` translate, so the sprite is offset by that amount.
+ */
+export const NORTHPOLE_ORIGIN = { x: 388.3, y: 153.8 } as const;
+export const NORTHPOLE_SVG_OFFSET = { x: 10.05, y: 10.4 } as const;
+
+/** Crash-site wave two-frame bob: center positions and per-phase duration (s). */
+export const WAVE_FRAME_A = { x: 87.75, y: 341.15 } as const;
+export const WAVE_FRAME_B = { x: 86.95, y: 341.95 } as const;
+export const WAVE_BOB_SECONDS = 1.0; // 20 frames @ 20fps
+
 /* Penguin name label (`Penguin`, extended) --------------------------------- */
 
 /** Name label under each penguin: black Arial 10px, centered (SWF `name` field). */
@@ -186,6 +253,12 @@ export const ASSET_ROCKETSNAIL = [
   "images/rocketsnail@2x.png",
   "images/rocketsnail@4x.png",
 ];
+
+/** SVG room art served from `public/assets/rooms/`. */
+export const ASSET_ROOM_NORTHPOLE = "assets/rooms/northpole.svg";
+export const ASSET_ROOM_CRASHED_BOBCAT = "assets/rooms/crashedbobcat.svg";
+export const ASSET_ROOM_WAVE = "assets/rooms/wave.svg";
+export const ASSET_ROOM_BOBCAT_LAYER2 = "assets/rooms/bobcatlayer2.svg";
 
 /** Icon sprite sources, keyed by the alias suffix used at load time. */
 export const ICON_SOURCES: Record<string, [string, string, string]> = {
