@@ -61,6 +61,9 @@ const MOVE_COOLDOWN: Duration = Duration::from_millis(500);
 const CHAT_COOLDOWN: Duration = Duration::from_millis(5000);
 const EMOTE_COOLDOWN: Duration = Duration::from_millis(5000);
 
+/// Minimum interval between room switches, advertised as `limits.join.cooldown`.
+const ROOM_COOLDOWN: Duration = Duration::from_secs(2);
+
 /// Absorbs scheduling/network jitter so a client that respects its own cooldown
 /// is never dropped by the server's slightly later arrival timestamp.
 const COOLDOWN_TOLERANCE: Duration = Duration::from_millis(50);
@@ -284,6 +287,8 @@ struct Connection {
     warned_malformed: bool,
     last_chat: Option<Instant>,
     last_emote: Option<Instant>,
+    /// Timestamp of the connection's last successful join, backing `ROOM_COOLDOWN`.
+    last_join: Option<Instant>,
 }
 
 impl Connection {
@@ -366,6 +371,7 @@ impl Connection {
                     },
                     "chat": { "maxLength": MAX_CHAT, "cooldown": CHAT_COOLDOWN.as_millis() as u64 },
                     "emote": { "maxLength": MAX_EMOTE, "cooldown": EMOTE_COOLDOWN.as_millis() as u64 },
+                    "join": { "cooldown": ROOM_COOLDOWN.as_millis() as u64 },
                 },
             },
         }));
@@ -388,6 +394,25 @@ impl Connection {
         };
 
         let room = resolve_room(value.get("room").and_then(Value::as_str));
+        let switching = self.joined && self.room != room;
+
+        // Mirrors the chat cooldown: a room switch within `ROOM_COOLDOWN` of the
+        // previous join is ignored, while the first-ever join is never blocked.
+        if switching && !Self::cooldown_elapsed(&mut self.last_join, ROOM_COOLDOWN) {
+            tracing::warn!(player = %id, from = self.room, to = room, "join ignored: room cooldown");
+            return;
+        }
+
+        // A re-join to a different room is a room switch: leave the old room
+        // first so no ghost player remains there, keeping the connection, its
+        // identity, and its position intact.
+        if switching {
+            let from = self.room;
+            self.leave_room();
+            tracing::info!(player = %id, nickname = %self.nickname, from = from, to = room, "penguin changed room");
+        } else {
+            self.last_join = Some(Instant::now());
+        }
         self.room = room;
 
         self.hub.insert(
@@ -540,6 +565,18 @@ impl Connection {
         broadcast(&self.hub.channels_all(self.room), payload);
     }
 
+    /// Remove this player from their current room and announce `R` to the peers
+    /// left behind. The removal precedes `channels_except`, so the leaver is
+    /// already gone and never receives its own departure frame.
+    fn leave_room(&mut self) {
+        let Some(id) = self.player_id.clone() else { return };
+
+        if self.hub.remove(self.room, &id) {
+            let payload = json!({ "type": "R", "i": id });
+            broadcast(&self.hub.channels_except(self.room, &id), payload);
+        }
+    }
+
     /// Remove the player (if joined) and notify the remaining peers.
     fn disconnect(&mut self, reason: &str) {
         let Some(id) = self.player_id.clone() else {
@@ -547,9 +584,8 @@ impl Connection {
             return;
         };
 
-        if self.joined && self.hub.remove(self.room, &id) {
-            let payload = json!({ "type": "R", "i": id });
-            broadcast(&self.hub.channels_except(self.room, &id), payload);
+        if self.joined {
+            self.leave_room();
         }
 
         tracing::info!(player = %id, nickname = %self.nickname, room = self.room, reason, "penguin left");
@@ -685,6 +721,7 @@ async fn handle_socket(socket: WebSocket, state: AppState, conn: String, client:
         warned_malformed: false,
         last_chat: None,
         last_emote: None,
+        last_join: None,
     };
 
     let mut shutdown_rx = state.shutdown_rx.clone();

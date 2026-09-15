@@ -28,6 +28,7 @@ export interface Limits {
   move: { minDistance: number; cooldown: number };
   chat: { maxLength: number; cooldown: number };
   emote: { maxLength: number; cooldown: number };
+  join: { cooldown: number };
 }
 
 /** `login` - identity assigned, sent in response to the first `guest`/`verify`. */

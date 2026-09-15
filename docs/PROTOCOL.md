@@ -29,9 +29,9 @@ used for the high-frequency in-room events.
 Players are grouped into rooms. A room is chosen with the optional `room` field
 of the `join` request; each room keeps its own player set and its own broadcast
 scope, so a player only ever sees `A`/`R`/`X`/`C`/`E`/`P` frames from players in
-the same room. There is no in-session room-change message on the wire: to switch
-rooms the client disconnects (which broadcasts `R` to the room it is leaving)
-and reconnects with a fresh `join` request carrying the desired `room`.
+the same room. A connection stays open while switching rooms: sending another
+`join` that names a different room leaves the current room and enters the new
+one on the same socket (see [`join`](#join---enter-the-room)).
 
 | Room id     | Display name | Notes                                   |
 | ----------- | ------------ | --------------------------------------- |
@@ -61,7 +61,8 @@ Sent immediately in response to the first `guest` (or `verify`) message.
     "limits": {
       "move": { "minDistance": 4, "cooldown": 0 },
       "chat": { "maxLength": 60, "cooldown": 500 },
-      "emote": { "maxLength": 60, "cooldown": 500 }
+      "emote": { "maxLength": 60, "cooldown": 500 },
+      "join": { "cooldown": 2000 }
     }
   }
 }
@@ -74,7 +75,8 @@ Sent immediately in response to the first `guest` (or `verify`) message.
 - `data.roles` - role metadata.
 - `data.limits` - client-side rate limits. `limits.move.minDistance` is the
   minimum pointer travel before a move is sent; `limits.chat.maxLength` and
-  `limits.emote.maxLength` cap message length; `cooldown` is in milliseconds.
+  `limits.emote.maxLength` cap message length; `limits.join.cooldown` is the
+  minimum interval between room joins; `cooldown` is in milliseconds.
 
 > The client treats a `login` as the handshake success and waits for it before
 > sending `join`. It rejects the connection on an `error` frame, so `login` is
@@ -232,6 +234,20 @@ out of the room and is invisible to others. The `room` field selects the room
 (see [Rooms](#rooms)); omitting it - or naming an unknown room - joins the
 default room, `penguin1`. All subsequent broadcasts are scoped to that room.
 
+A connection may send `join` more than once to switch rooms in-session. When a
+`join` names a different room than the one the connection is currently in, the
+server first removes the player from the room being left and broadcasts `R` to
+that room's remaining players, then registers the player in the new room, replies
+with the new `join` snapshot, and announces the player with `A` to the new room's
+other players. The connection, player id, and nickname are unchanged, and the
+player keeps its current coordinates across the switch. All subsequent broadcasts
+are scoped to the new room.
+
+Room switches are rate-limited like chat: a `join` that would change rooms within
+`limits.join.cooldown` milliseconds of the previous join (2000 on this server) is
+ignored, leaving the player in their current room; a successful switch restarts
+the window.
+
 ### `move`
 
 ```json
@@ -286,8 +302,11 @@ Ordering guarantees and rules:
 - A `join` snapshot lists players already in the room **and** the joiner.
 - Every room-scoped frame (`A`, `R`, `X`, `C`, `E`, `P`) only reaches players in
   the sender's room.
-- A player is only added to the room on `join`, and only removed on disconnect
-  if they had joined.
+- A player is only added to the room on `join`, and removed either on disconnect
+  (if they had joined) or when switching to another room.
+- Sending `join` for a different room while already joined moves the player
+  between rooms on the same connection: `R` is broadcast to the room being left
+  and `A` to the room being entered. No disconnect occurs.
 - `chat`, `emote`, `move`, and `trigger` are ignored until the player has joined.
 - Malformed or non-JSON frames are logged and skipped; the connection is kept
   open.

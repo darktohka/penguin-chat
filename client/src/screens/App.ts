@@ -54,8 +54,6 @@ export class App {
   private current: Container | null = null;
   private socket: GameClient | null = null;
   private intentionalDisconnect = false;
-  private username: string | undefined;
-  private roomId: string = DEFAULT_ROOM_ID;
 
   constructor(
     private readonly app: Application,
@@ -130,8 +128,6 @@ export class App {
     username: string | undefined,
     roomId: string,
   ): Promise<void> {
-    this.username = username;
-    this.roomId = roomId;
     await this.showStatus("Connecting to Server");
 
     const client = new GameClient({ url: defaultSocketUrl(), game: GAME_ID });
@@ -147,25 +143,7 @@ export class App {
       await Promise.all([client.connect(), delay(CONNECT_DELAY_MS)]);
       client.guest(username);
       await loggedIn;
-      await this.showStatus("Loading World");
-
-      const joined = once(client, "joined");
-      client.join(roomId);
-      const [joinPayload, spritesheet] = await Promise.all([
-        joined,
-        loadSpritesheet(),
-        loadIcons(),
-        delay(CONNECT_DELAY_MS),
-      ]);
-
-      const world = new World(client, spritesheet, this.app.renderer);
-      world.onDisconnect = () => {
-        this.teardownSocket();
-        void this.showLoggedOff();
-      };
-      world.onRoomChange = (roomId) => void this.switchRoom(roomId);
-      await world.init(this.container, joinPayload);
-      this.setScreen(world);
+      await this.loadWorld(client, roomId);
     } catch (error) {
       if (this.socket === client) {
         console.error("Connection failed:", error);
@@ -174,10 +152,43 @@ export class App {
     }
   }
 
-  /** Tear down the current session and reconnect into another room. */
+  /**
+   * Show the Loading World screen, join `roomId` on the live `client`, and
+   * display the resulting world. Shared by the first join and room switches,
+   * so the socket is never recreated.
+   */
+  private async loadWorld(client: GameClient, roomId: string): Promise<void> {
+    await this.showStatus("Loading World");
+    const joined = once(client, "joined");
+    client.join(roomId);
+    const [joinPayload, spritesheet] = await Promise.all([
+      joined,
+      loadSpritesheet(),
+      loadIcons(),
+      delay(CONNECT_DELAY_MS),
+    ]);
+
+    const world = new World(client, spritesheet, this.app.renderer);
+    world.onDisconnect = () => {
+      this.teardownSocket();
+      void this.showLoggedOff();
+    };
+    world.onRoomChange = (next) => void this.switchRoom(next);
+    await world.init(this.container, joinPayload);
+    this.setScreen(world);
+  }
+
+  /** Switch rooms over the existing connection (no reconnect). */
   private async switchRoom(roomId: string): Promise<void> {
-    if (roomId === this.roomId) return;
-    this.teardownSocket();
-    await this.play(this.username, roomId);
+    const client = this.socket;
+    if (!client) return;
+    try {
+      await this.loadWorld(client, roomId);
+    } catch (error) {
+      if (this.socket === client) {
+        console.error("Room change failed:", error);
+        await this.showUnavailable();
+      }
+    }
   }
 }

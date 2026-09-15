@@ -104,7 +104,6 @@ export class World extends Container {
 
   /** Called when the user clicks the disconnect button. */
   public onDisconnect: (() => void) | undefined;
-
   /** Called when the user picks a different room from the in-room selector. */
   public onRoomChange: ((roomId: string) => void) | undefined;
 
@@ -352,11 +351,16 @@ export class World extends Container {
   }
 
   /**
-   * Ask the app to reconnect into `roomId`; the app tears this screen down and
-   * rebuilds it, so a second click arriving before teardown is ignored.
+   * Ask the app to switch this connection into `roomId`. Refuses while the
+   * server-advertised room-switch cooldown is active, restoring the radio so
+   * the UI matches the room the player is still in.
    */
   private requestRoomChange(roomId: string): void {
     if (this.reconnecting || roomId === this.roomId) return;
+    if (this.socket.cooldownRemaining("join") > 0) {
+      this.roomSelector?.select(this.roomId);
+      return;
+    }
     this.reconnecting = true;
     this.onRoomChange?.(roomId);
   }

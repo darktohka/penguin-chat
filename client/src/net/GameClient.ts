@@ -54,7 +54,7 @@ export interface GameClientOptions {
 }
 
 /** Keys on which client-side rate limits are tracked. */
-type CooldownKey = "move" | "chat" | "emote";
+type CooldownKey = "move" | "chat" | "emote" | "join";
 
 /**
  * High-level game client: owns a `Socket`, decodes server frames into typed
@@ -74,6 +74,7 @@ export class GameClient extends Emitter<GameEvents> {
     move: 0,
     chat: 0,
     emote: 0,
+    join: 0,
   };
 
   constructor(options: GameClientOptions = {}) {
@@ -335,8 +336,11 @@ export class GameClient extends Emitter<GameEvents> {
     return true;
   }
 
-  join(room: string): void {
+  /** Enter `room`, or switch rooms. Honors the server-advertised join cooldown. */
+  join(room: string): boolean {
+    if (!this.checkCooldown("join")) return false;
     this.transport.send({ type: "join", room });
+    return true;
   }
 
   /** Trigger a play animation. Unreachable from the archived UI. */
