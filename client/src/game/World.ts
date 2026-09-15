@@ -40,7 +40,6 @@ import {
   LOG_Y,
   LOG_BUTTON_POS,
   RES_BUTTON_POS,
-  RES_ZOOM_LEVELS,
   NORTHPOLE_ORIGIN,
   NORTHPOLE_SVG_OFFSET,
   SEND_BUTTON_POS,
@@ -51,6 +50,11 @@ import {
   WORLD_ROOM_RADIO_FIRST_Y,
   WORLD_ROOM_RADIO_X,
 } from "../core/constants";
+import {
+  advanceZoom,
+  registerBaseResolution,
+  zoomScale,
+} from "../core/resolution";
 import type { GameClient, GameEvents } from "../net/GameClient";
 import { playPop } from "../audio/sfx";
 import {
@@ -106,7 +110,6 @@ export class World extends Container {
   private waveTimer: ReturnType<typeof gsap.delayedCall> | undefined;
   private waveOnSecondFrame = false;
   private margin = 0;
-  private resolutionIndex = 0;
   private readonly baseResolution: number;
   private container: HTMLElement | undefined;
   private unsubscribers: Array<() => void> = [];
@@ -135,7 +138,7 @@ export class World extends Container {
     super();
     this.socket = socket;
     this.spritesheet = spritesheet;
-    this.baseResolution = renderer.resolution;
+    this.baseResolution = registerBaseResolution(renderer.resolution);
   }
 
   /** Build the scene and subscribe to the room. */
@@ -414,7 +417,7 @@ export class World extends Container {
   }
 
   private cycleResolution(): void {
-    this.resolutionIndex = (this.resolutionIndex + 1) % RES_ZOOM_LEVELS.length;
+    advanceZoom();
     this.applyResolution();
   }
 
@@ -425,7 +428,7 @@ export class World extends Container {
    * full pixel density instead of being a stretched, blurry bitmap.
    */
   private applyResolution(): void {
-    const scale = RES_ZOOM_LEVELS[this.resolutionIndex];
+    const scale = zoomScale();
     this.container?.style.setProperty("zoom", String(scale));
     this.renderer.resolution = this.baseResolution * scale;
   }
@@ -596,9 +599,11 @@ export class World extends Container {
     this.waveTimer?.kill();
     this.waveTimer = undefined;
     this.chatInput?.remove();
-    this.container?.style.setProperty("zoom", "1");
+    // The zoom and renderer resolution are deliberately left untouched: they
+    // are app-wide state (see `core/resolution`), so the next `World` re-applies
+    // the player's chosen level instead of it resetting on room change or
+    // disconnect.
     this.container = undefined;
-    this.renderer.resolution = this.baseResolution;
 
     for (const unsubscribe of this.unsubscribers) unsubscribe();
     this.unsubscribers = [];

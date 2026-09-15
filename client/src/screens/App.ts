@@ -58,6 +58,8 @@ export class App {
   private intentionalDisconnect = false;
   /** Persisted between joins: the next room you enter is joined as a snowcat. */
   private wantSnowcat = false;
+  /** Last nickname chosen this session, prefilled into the setup screen. */
+  private lastNickname = "";
 
   constructor(
     private readonly app: Application,
@@ -98,8 +100,11 @@ export class App {
   }
 
   private async showSetup(): Promise<void> {
-    const screen = new SetupScreen(this.container);
-    screen.onNext = (username, roomId) => void this.play(username, roomId);
+    const screen = new SetupScreen(this.container, this.lastNickname);
+    screen.onNext = (username, roomId) => {
+      if (username) this.lastNickname = username;
+      void this.play(username, roomId);
+    };
     await screen.init();
     this.setScreen(screen);
   }

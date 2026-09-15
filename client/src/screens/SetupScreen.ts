@@ -37,7 +37,10 @@ export class SetupScreen extends BaseScreen {
   private roomSelector!: RoomSelector;
   private nameInput!: HTMLInputElement;
 
-  constructor(private readonly container: HTMLElement) {
+  constructor(
+    private readonly container: HTMLElement,
+    private readonly initialName: string = "",
+  ) {
     super();
   }
 
@@ -72,6 +75,7 @@ export class SetupScreen extends BaseScreen {
     this.nameInput.type = "text";
     this.nameInput.maxLength = MAX_NICKNAME_LENGTH;
     this.nameInput.placeholder = DEFAULT_NICKNAME;
+    this.nameInput.value = this.initialName;
     this.nameInput.onkeydown = (event) => {
       if (event.key === "Enter") this.submit();
     };
