@@ -134,6 +134,93 @@ export const HOLE_STEP_SECONDS = 1 / 20;
 /** Sprite scale while it is down inside the hole. */
 export const HOLE_SPRITE_SCALE = 0.3;
 
+/* Critter type (server-synced) ---------------------------------------------- */
+
+/** Critter `type` the server assigns to a plain penguin, and its default. */
+export const CRITTER_TYPE_DEFAULT = "default";
+/** Critter `type` sent on `join` (and broadcast) to be rendered as a snowcat. */
+export const CRITTER_TYPE_SNOWCAT = "snowcat";
+
+/* Snowcat sprite (`Snowcat`) ------------------------------------------------ */
+
+/**
+ * The original SWF places the snowcat at scale 0.439682.
+ */
+export const SNOWCAT_SCALE = 0.439682;
+
+/**
+ * The snowcat's composed origin offset. Its frames place the composed sprite at
+ * `(3, 9)` twips in the SWF matrix; twips are 1/20 px.
+ */
+export const SNOWCAT_ORIGIN_OFFSET = { x: 3 / 20, y: 9 / 20 } as const;
+
+/**
+ * Seconds per underside pose while walking. The snowcat's underside sub-sprites
+ * (`DefineSprite_121/131/133/135/137`) have two frames and the SWF plays at 20 fps.
+ */
+export const SNOWCAT_WALK_STEP_SECONDS = 1 / 20;
+
+/** Name label offset under a snowcat: its tall body pushes the label further down. */
+export const SNOWCAT_NAME_TEXT_OFFSET_Y = 48;
+
+/**
+ * Each shape's native SVG size plus its registration origin (the `<g transform>`
+ * translate) within that space. `Snowcat` turns the origin into a sprite anchor
+ * so every shape lines up on the character origin, exactly as the SWF places
+ * them at `(0,0)`. Using the SVG's own size keeps the maths independent of how
+ * Pixi rasterises the SVG.
+ */
+export const SNOWCAT_SHAPES: Record<
+  number,
+  { readonly origin: readonly [number, number]; readonly size: readonly [number, number] }
+> = {
+  118: { origin: [74.7, 46.35], size: [149.45, 138.85] },
+  119: { origin: [40.55, 92.35], size: [97.95, 150.2] },
+  120: { origin: [72.8, 48.4], size: [145.65, 141.85] },
+  122: { origin: [72.2, 56.7], size: [144.45, 142.5] },
+  123: { origin: [36.45, 81.55], size: [94.35, 122.45] },
+  124: { origin: [99.65, 68.4], size: [199.3, 170.3] },
+  125: { origin: [72.0, 101.2], size: [158.0, 153.55] },
+  126: { origin: [83.35, 36.9], size: [166.5, 127.85] },
+  127: { origin: [65.5, 90.9], size: [146.0, 140.0] },
+  128: { origin: [99.65, 57.85], size: [199.3, 165.35] },
+  129: { origin: [72.65, 107.5], size: [157.1, 160.0] },
+  130: { origin: [72.1, 56.55], size: [144.2, 140.6] },
+  132: { origin: [100.0, 70.0], size: [200.0, 170.35] },
+  134: { origin: [82.4, 29.7], size: [164.45, 121.4] },
+  136: { origin: [101.25, 52.7], size: [202.5, 159.2] },
+};
+
+/**
+ * One snowcat direction: the never-animated `upper` shape plus the two `lower`
+ * (underside) poses that alternate while walking. `mirror` flips the pair
+ * horizontally, which is how the SWF draws `dir` 6-8 (it reuses these shapes
+ * with a negated `scaleX`).
+ */
+export interface SnowcatPose {
+  readonly upper: number;
+  readonly lower: readonly [number, number];
+  readonly mirror: boolean;
+}
+
+/**
+ * Direction index (0 = N, 2 = E, 4 = S, 6 = W) to shapes. The SWF numbers its
+ * directions the same way from 1 (frame `dir + 10`), so client `d` is SWF `d + 1`
+ * here: idle sprites 11-18 are `DefineSprite_138` frames 11-18. The SWF draws the
+ * westerly directions by mirroring the easterly ones (frames 16/17/18 repeat
+ * 14/13/12 with `scaleX = -1`).
+ */
+export const SNOWCAT_POSES: readonly SnowcatPose[] = [
+  { upper: 123, lower: [122, 130], mirror: false }, // 0 N  (frame 11)
+  { upper: 125, lower: [124, 132], mirror: false }, // 1 NE (frame 12)
+  { upper: 127, lower: [126, 134], mirror: false }, // 2 E  (frame 13)
+  { upper: 129, lower: [128, 136], mirror: false }, // 3 SE (frame 14)
+  { upper: 119, lower: [118, 120], mirror: false }, // 4 S  (frame 15)
+  { upper: 129, lower: [128, 136], mirror: true }, //  5 SW (frame 18)
+  { upper: 127, lower: [126, 134], mirror: true }, //  6 W  (frame 17)
+  { upper: 125, lower: [124, 132], mirror: true }, //  7 NW (frame 16)
+];
+
 /* Speech balloon ----------------------------------------------------------- */
 
 export const BALLOON_FILL = 0x003399; // 13209

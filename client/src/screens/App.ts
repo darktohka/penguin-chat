@@ -1,6 +1,8 @@
 import type { Application, Container } from "pixi.js";
 import {
   CONNECT_DELAY_MS,
+  CRITTER_TYPE_DEFAULT,
+  CRITTER_TYPE_SNOWCAT,
   DEFAULT_ROOM_ID,
   EXTENDED,
   GAME_ID,
@@ -54,6 +56,8 @@ export class App {
   private current: Container | null = null;
   private socket: GameClient | null = null;
   private intentionalDisconnect = false;
+  /** Persisted between joins: the next room you enter is joined as a snowcat. */
+  private wantSnowcat = false;
 
   constructor(
     private readonly app: Application,
@@ -160,7 +164,14 @@ export class App {
   private async loadWorld(client: GameClient, roomId: string): Promise<void> {
     await this.showStatus("Loading World");
     const joined = once(client, "joined");
-    client.join(roomId);
+    client.join(
+      roomId,
+      EXTENDED
+        ? this.wantSnowcat
+          ? CRITTER_TYPE_SNOWCAT
+          : CRITTER_TYPE_DEFAULT
+        : undefined,
+    );
     const [joinPayload, spritesheet] = await Promise.all([
       joined,
       loadSpritesheet(),
@@ -174,6 +185,10 @@ export class App {
       void this.showLoggedOff();
     };
     world.onRoomChange = (next) => void this.switchRoom(next);
+    world.onToggleSnowcat = () => {
+      this.wantSnowcat = !this.wantSnowcat;
+      return this.wantSnowcat;
+    };
     await world.init(this.container, joinPayload);
     this.setScreen(world);
   }

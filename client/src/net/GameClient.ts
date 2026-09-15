@@ -336,10 +336,17 @@ export class GameClient extends Emitter<GameEvents> {
     return true;
   }
 
-  /** Enter `room`, or switch rooms. Honors the server-advertised join cooldown. */
-  join(room: string): boolean {
+  /**
+   * Enter `room`, or switch rooms. Honors the server-advertised join cooldown.
+   * `critterType` asks the server to register this player as that critter.
+   */
+  join(room: string, critterType?: string): boolean {
     if (!this.checkCooldown("join")) return false;
-    this.transport.send({ type: "join", room });
+    this.transport.send({
+      type: "join",
+      room,
+      ...(critterType ? { critterType } : {}),
+    });
     return true;
   }
 

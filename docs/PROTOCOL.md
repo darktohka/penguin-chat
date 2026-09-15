@@ -140,7 +140,7 @@ Broadcast to everyone **except** the joiner when a player enters the room.
 | `i`      | player id                                              |
 | `n`      | nickname                                               |
 | `x`, `y` | spawn position                                         |
-| `c`      | critter descriptor `{ t: type, o: outfit }` (optional) |
+| `c`      | critter descriptor `{ t: type, o: outfit }` (optional); `t` is `default` or `snowcat` |
 
 ### `R` - player removed
 
@@ -225,7 +225,7 @@ preceded by an `info` frame.
 ### `join` - enter the room
 
 ```json
-{ "type": "join", "room": "penguin1" }
+{ "type": "join", "room": "penguin1", "critterType": "snowcat" }
 ```
 
 The server registers the player, replies with the `join` snapshot, and announces
@@ -233,6 +233,12 @@ the player to others with `A`. A player who logs in but never sends `join` stays
 out of the room and is invisible to others. The `room` field selects the room
 (see [Rooms](#rooms)); omitting it - or naming an unknown room - joins the
 default room, `penguin1`. All subsequent broadcasts are scoped to that room.
+
+An optional `critterType` field selects the character the player is rendered as:
+`"default"` (a penguin) or `"snowcat"`. Any other value - or an omitted field -
+falls back to `"default"`. The resolved type is echoed in that player's `critter`
+descriptor (`join` snapshots and `A` frames) so every client renders the same
+character. Only the extended client sends this field.
 
 A connection may send `join` more than once to switch rooms in-session. When a
 `join` names a different room than the one the connection is currently in, the

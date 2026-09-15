@@ -161,6 +161,8 @@ export interface VerifyFrame {
 export interface JoinRequestFrame {
   type: "join";
   room: string;
+  /** Requested critter type (`"snowcat"` / `"default"`); absent means default. */
+  critterType?: string;
 }
 
 export interface MoveFrame {

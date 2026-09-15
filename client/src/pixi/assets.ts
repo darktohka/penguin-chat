@@ -10,6 +10,7 @@ import {
   ASSET_TITLE,
   ICON_SOURCES,
   MAX_RESOLUTION,
+  SNOWCAT_SHAPES,
 } from "../core/constants";
 
 /** Initialize the Pixi asset system with the client's resolution preference. */
@@ -57,6 +58,24 @@ export async function loadChrome(): Promise<{
     Assets.load<Texture>({ alias: "rocketsnail", src: [...ASSET_ROCKETSNAIL] }),
   ]);
   return { title, loading, rocketsnail };
+}
+
+/**
+ * Load every snowcat shape SVG as a texture, keyed by its SWF shape id. Pixi
+ * caches each under a stable alias, so reloading is free once fetched.
+ */
+export async function loadSnowcatShapes(): Promise<Map<number, Texture>> {
+  const entries = await Promise.all(
+    Object.keys(SNOWCAT_SHAPES).map(async (key) => {
+      const id = Number(key);
+      const texture = await Assets.load<Texture>({
+        alias: `snowcat:${id}`,
+        src: `assets/snowcat/${id}.svg`,
+      });
+      return [id, texture] as const;
+    }),
+  );
+  return new Map(entries);
 }
 
 /** A `Texture[]` for a walk direction, falling back to the default direction. */

@@ -6,6 +6,7 @@ import {
   Text,
   type Renderer,
   type Spritesheet,
+  type Texture,
 } from "pixi.js";
 import { gsap } from "gsap/gsap-core";
 import {
@@ -13,6 +14,7 @@ import {
   CHAT_INPUT_LEFT,
   CHAT_INPUT_MAX_LENGTH,
   CHAT_INPUT_WIDTH,
+  CRITTER_TYPE_SNOWCAT,
   DEFAULT_ROOM_ID,
   DISCONNECT_BUTTON_POS,
   EXTENDED,
@@ -51,10 +53,16 @@ import {
 } from "../core/constants";
 import type { GameClient, GameEvents } from "../net/GameClient";
 import { playPop } from "../audio/sfx";
-import { loadRoomAssets, type RoomAssets } from "../pixi/assets";
+import {
+  loadRoomAssets,
+  loadSnowcatShapes,
+  type RoomAssets,
+} from "../pixi/assets";
 import { IconButton, type IconHelp } from "../pixi/IconButton";
 import { RoomSelector } from "../pixi/RoomSelector";
+import { Character } from "./Character";
 import { Penguin } from "./Penguin";
+import { Snowcat } from "./Snowcat";
 
 /** Clamp a value to `[min, max]`. */
 function clamp(value: number, min: number, max: number): number {
@@ -71,7 +79,7 @@ export type JoinPayload = GameEvents["joined"];
 export class World extends Container {
   private readonly socket: GameClient;
   private readonly spritesheet: Spritesheet;
-  private readonly players = new Map<string, Penguin>();
+  private readonly players = new Map<string, Character>();
   private readonly backgroundLayer = new Container();
   private readonly playerLayer = new Container();
   private readonly foregroundLayer = new Container();
@@ -83,9 +91,10 @@ export class World extends Container {
   private readonly logTexts: Text[] = [];
   private readonly names = new Map<string, string>();
   private readonly leaving = new Map<
-    Penguin,
+    Character,
     ReturnType<typeof gsap.timeline>
   >();
+  private snowcatShapes: ReadonlyMap<number, Texture> | undefined;
 
   private chatInput!: HTMLInputElement;
   private sendButton!: IconButton;
@@ -106,6 +115,11 @@ export class World extends Container {
   public onDisconnect: (() => void) | undefined;
   /** Called when the user picks a different room from the in-room selector. */
   public onRoomChange: ((roomId: string) => void) | undefined;
+  /**
+   * Called when the user clicks the north pole. Returns the new snowcat flag so
+   * the world can confirm the change; it only takes effect on the next join.
+   */
+  public onToggleSnowcat: (() => boolean) | undefined;
 
   private readonly keyHandler = (event: KeyboardEvent): void =>
     this.handleKey(event);
@@ -129,7 +143,11 @@ export class World extends Container {
     this.margin = (join.room.margin as number | undefined) ?? 0;
     this.roomId = join.roomId;
     this.container = container;
-    const room = await loadRoomAssets(join.roomId);
+    const [room, snowcatShapes] = await Promise.all([
+      loadRoomAssets(join.roomId),
+      loadSnowcatShapes(),
+    ]);
+    this.snowcatShapes = snowcatShapes;
     this.buildWorld(room);
     this.buildChatLog();
     this.buildToolbar(container);
@@ -143,6 +161,7 @@ export class World extends Container {
         player.x,
         player.y,
         player.id === this.socket.playerId,
+        player.critter?.type,
       );
     }
 
@@ -193,6 +212,18 @@ export class World extends Container {
           NORTHPOLE_ORIGIN.x - NORTHPOLE_SVG_OFFSET.x,
           NORTHPOLE_ORIGIN.y - NORTHPOLE_SVG_OFFSET.y,
         );
+        shape.eventMode = "static";
+        shape.cursor = "pointer";
+        shape.on("pointerdown", (event) => {
+          event.stopPropagation();
+          const enabled = this.onToggleSnowcat?.();
+          if (enabled === undefined) return;
+          this.addChatLine(
+            enabled
+              ? "Snowcat mode on - rejoin a room to apply"
+              : "Snowcat mode off - rejoin a room to apply",
+          );
+        });
         this.backgroundLayer.addChild(shape);
         return;
       }
@@ -408,6 +439,7 @@ export class World extends Container {
           event.player.x,
           event.player.y,
           !document.hidden,
+          event.player.critter?.type,
         );
       }),
       this.socket.on("playerRemoved", (event) => {
@@ -416,13 +448,13 @@ export class World extends Container {
         this.players.delete(event.playerId);
         gsap.killTweensOf(penguin);
         if (event.playerId === this.socket.playerId || document.hidden) {
-          this.removePenguin(penguin);
+          this.removeCharacter(penguin);
         } else {
           if (EXTENDED) playPop();
           const drop = penguin.playDrop();
           this.leaving.set(penguin, drop);
           drop.then(() => {
-            if (this.leaving.has(penguin)) this.removePenguin(penguin);
+            if (this.leaving.has(penguin)) this.removeCharacter(penguin);
           });
         }
       }),
@@ -450,6 +482,7 @@ export class World extends Container {
     x: number,
     y: number,
     playIntro: boolean,
+    critterType: string | undefined,
   ): void {
     if (this.players.has(id)) {
       const existing = this.players.get(id)!;
@@ -459,33 +492,46 @@ export class World extends Container {
     }
 
     const isLocal = id === this.socket.playerId;
-    this.names.set(id, nickname ?? id);
-    const penguin = new Penguin(
-      id,
-      nickname ?? id,
-      x,
-      y,
-      this.spritesheet,
-      this.overlayLayer,
-      isLocal,
-    );
-    this.players.set(id, penguin);
-    this.playerLayer.addChild(penguin);
+    const displayName = nickname ?? id;
+    const snowcatShapes = this.snowcatShapes;
+    this.names.set(id, displayName);
+    const character =
+      critterType === CRITTER_TYPE_SNOWCAT && snowcatShapes
+        ? new Snowcat(
+            id,
+            displayName,
+            x,
+            y,
+            snowcatShapes,
+            this.overlayLayer,
+            isLocal,
+          )
+        : new Penguin(
+            id,
+            displayName,
+            x,
+            y,
+            this.spritesheet,
+            this.overlayLayer,
+            isLocal,
+          );
+    this.players.set(id, character);
+    this.playerLayer.addChild(character);
     if (EXTENDED) playPop();
-    if (playIntro) penguin.playIntro();
+    if (playIntro) character.playIntro();
   }
 
-  private removePenguin(penguin: Penguin): void {
-    this.leaving.delete(penguin);
-    this.playerLayer.removeChild(penguin);
-    penguin.destroy();
+  private removeCharacter(character: Character): void {
+    this.leaving.delete(character);
+    this.playerLayer.removeChild(character);
+    character.destroy();
   }
 
   private resync(): void {
     for (const penguin of this.players.values()) penguin.resync();
     for (const [penguin, drop] of [...this.leaving]) {
       drop.kill();
-      this.removePenguin(penguin);
+      this.removeCharacter(penguin);
     }
     this.startChatCooldown();
   }

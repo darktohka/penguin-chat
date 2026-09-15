@@ -36,7 +36,12 @@ const WORLD_WIDTH: f64 = 600.0;
 const WORLD_HEIGHT: f64 = 400.0;
 
 const ROLE_GUEST: &str = "guest";
-const CRITTER_TYPE: &str = "default";
+
+/// Critter type used when a client does not ask for one: an ordinary penguin.
+const CRITTER_TYPE_DEFAULT: &str = "default";
+
+/// Critter type a client may request on `join` to be rendered as a snowcat.
+const CRITTER_TYPE_SNOWCAT: &str = "snowcat";
 
 /// Guest nickname assigned to every anonymous player, as the original does.
 const NICKNAME: &str = "Guest";
@@ -92,15 +97,15 @@ const SPAWN_Y: f64 = 210.0;
 pub struct Critter {
     pub nickname: String,
     #[serde(rename = "type")]
-    pub critter_type: &'static str,
+    pub critter_type: String,
     pub outfit: Value,
 }
 
 impl Critter {
-    fn guest(nickname: &str) -> Self {
+    fn new(nickname: &str, critter_type: &str) -> Self {
         Self {
             nickname: nickname.to_owned(),
-            critter_type: CRITTER_TYPE,
+            critter_type: critter_type.to_owned(),
             outfit: Value::Object(serde_json::Map::new()),
         }
     }
@@ -124,6 +129,9 @@ struct Player {
     /// The nickname chosen at login; snapshots and announcements read it so each
     /// player is labelled with its own name rather than a global default.
     nickname: String,
+    /// Critter type this player joined as (`"default"` or `"snowcat"`), broadcast
+    /// to peers so every client renders the same character.
+    critter_type: &'static str,
     tx: mpsc::Sender<Message>,
 }
 
@@ -175,7 +183,7 @@ impl Hub {
                         nickname: EXTENDED.then(|| player.nickname.clone()),
                         x: player.x,
                         y: player.y,
-                        critter: Critter::guest(&player.nickname),
+                        critter: Critter::new(&player.nickname, player.critter_type),
                     })
                     .collect()
             })
@@ -281,6 +289,8 @@ struct Connection {
     room: &'static str,
     /// Sanitised nickname chosen at login, used for every announcement.
     nickname: String,
+    /// Critter type requested by the last `join` (`"default"` / `"snowcat"`).
+    critter_type: &'static str,
     x: f64,
     y: f64,
     joined: bool,
@@ -361,7 +371,7 @@ impl Connection {
                 "id": id,
                 "username": id,
                 "nickname": &self.nickname,
-                "critter": Critter::guest(&self.nickname),
+                "critter": Critter::new(&self.nickname, CRITTER_TYPE_DEFAULT),
                 "roles": [ROLE_GUEST],
                 "limits": {
                     "move": {
@@ -394,6 +404,7 @@ impl Connection {
         };
 
         let room = resolve_room(value.get("room").and_then(Value::as_str));
+        self.critter_type = resolve_critter_type(value.get("critterType").and_then(Value::as_str));
         let switching = self.joined && self.room != room;
 
         // Mirrors the chat cooldown: a room switch within `ROOM_COOLDOWN` of the
@@ -422,6 +433,7 @@ impl Connection {
                 x: self.x,
                 y: self.y,
                 nickname: self.nickname.clone(),
+                critter_type: self.critter_type,
                 tx: self.tx.clone(),
             },
         );
@@ -450,7 +462,7 @@ impl Connection {
             "n": &self.nickname,
             "x": self.x,
             "y": self.y,
-            "c": { "t": CRITTER_TYPE, "o": {} },
+            "c": { "t": self.critter_type, "o": {} },
         });
         broadcast(&self.hub.channels_except(room, &id), announcement);
 
@@ -630,6 +642,20 @@ fn resolve_room(requested: Option<&str>) -> &'static str {
         .unwrap_or(DEFAULT_ROOM)
 }
 
+/// Resolve a client-requested critter type, defaulting to a plain penguin.
+///
+/// Only the extended client sends `critterType`; with `EXTENDED` off it is
+/// ignored so every player stays a penguin.
+fn resolve_critter_type(requested: Option<&str>) -> &'static str {
+    if !EXTENDED {
+        return CRITTER_TYPE_DEFAULT;
+    }
+    match requested {
+        Some(CRITTER_TYPE_SNOWCAT) => CRITTER_TYPE_SNOWCAT,
+        _ => CRITTER_TYPE_DEFAULT,
+    }
+}
+
 /// Sanitise an optional client-supplied nickname into a display name.
 ///
 /// The raw string is trimmed, stripped of control characters, then truncated to
@@ -715,6 +741,7 @@ async fn handle_socket(socket: WebSocket, state: AppState, conn: String, client:
         player_id: None,
         room: DEFAULT_ROOM,
         nickname: NICKNAME.to_owned(),
+        critter_type: CRITTER_TYPE_DEFAULT,
         x: 0.0,
         y: 0.0,
         joined: false,
