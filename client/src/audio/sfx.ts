@@ -38,7 +38,7 @@ export function playSnowcatToggle(enabled: boolean): Promise<void> {
   if (!template) {
     template = new Audio(path);
     template.preload = "auto";
-    template.volume = 0.2;
+    template.volume = 0.1;
     snowcatTemplates.set(path, template);
   }
   const sound = template.cloneNode() as HTMLAudioElement;
@@ -51,6 +51,7 @@ export function playSnowcatToggle(enabled: boolean): Promise<void> {
     };
     sound.addEventListener("ended", done, { once: true });
     sound.addEventListener("error", done, { once: true });
+    sound.volume = 0.1;
     void sound.play().catch(done);
   });
 }

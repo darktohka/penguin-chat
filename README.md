@@ -6,6 +6,20 @@ It serves the game client and the server from the same Docker image.
 
 Live at <https://penguinchat.tohka.us>.
 
+## Extra features
+
+The original HTML 5 Experimental Penguins client has been extended to more closely resemble the original Flash game. Namely:
+1. You can now play through all three original maps: **Snow Room**, **North Pole** and **Crash Site**!
+2. You can become a **Snow Cat** by pressing on the **North Pole** pole, and moving to a new room.
+3. You can now choose your own name, and the map you'd like to play, on login.
+4. You can now switch maps while playing.
+5. Penguin names are now shown under each penguin.
+6. The **Change resolution** button is now back. In the original game, it toggled quality levels. In the browser version, it makes the game canvas larger.
+7. The original button hover color (red) is now restored, instead of dark blue.
+8. All assets are now using their original vector art, where possible.
+9. For the Crash Site, which did not have vector art, we've created custom vector art that resembles the original raster art. Z-order is kept.
+10. The penguin joining sound is back, with reduced volume.
+
 ## Run with Docker
 
 The published image is `darktohka/penguin-chat:latest` (also tagged `1.20.2`).
