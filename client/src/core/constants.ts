@@ -354,12 +354,6 @@ export const ASSET_ROCKETSNAIL = [
   "images/rocketsnail@4x.png",
 ];
 
-/** SVG room art served from `public/assets/rooms/`. */
-export const ASSET_ROOM_NORTHPOLE = "assets/rooms/northpole.svg";
-export const ASSET_ROOM_CRASHED_BOBCAT = "assets/rooms/crashedbobcat.svg";
-export const ASSET_ROOM_WAVE = "assets/rooms/wave.svg";
-export const ASSET_ROOM_BOBCAT_LAYER2 = "assets/rooms/bobcatlayer2.svg";
-
 /** Icon sprite sources, keyed by the alias suffix used at load time. */
 export const ICON_SOURCES: Record<string, [string, string, string]> = {
   send: [

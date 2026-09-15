@@ -1,17 +1,19 @@
 import { Assets, Sprite, Texture, type Spritesheet } from "pixi.js";
+import { ROOM_SVGS } from "../assets/roomSvgs";
+import { SNOWCAT_SHAPE_SVGS } from "../assets/snowcatShapes";
 import {
   ASSET_LOADING,
   ASSET_ROCKETSNAIL,
-  ASSET_ROOM_BOBCAT_LAYER2,
-  ASSET_ROOM_CRASHED_BOBCAT,
-  ASSET_ROOM_NORTHPOLE,
-  ASSET_ROOM_WAVE,
   ASSET_SHEET,
   ASSET_TITLE,
   ICON_SOURCES,
   MAX_RESOLUTION,
-  SNOWCAT_SHAPES,
 } from "../core/constants";
+
+// Pixi's SVG loader expects a URL, so inlined SVG text is encoded as a `data:` URI.
+function svgDataUri(svg: string): string {
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}
 
 /** Initialize the Pixi asset system with the client's resolution preference. */
 export async function initAssets(): Promise<void> {
@@ -61,16 +63,19 @@ export async function loadChrome(): Promise<{
 }
 
 /**
- * Load every snowcat shape SVG as a texture, keyed by its SWF shape id. Pixi
- * caches each under a stable alias, so reloading is free once fetched.
+ * Load every snowcat shape as a texture, keyed by its SWF shape id.
+ *
+ * The shape SVGs are bundled into the JS at build time (`SNOWCAT_SHAPE_SVGS`),
+ * so each is loaded as an inline `data:` URI: no per-shape HTTP requests. Pixi
+ * caches each under a stable alias, so reloading is free once decoded.
  */
 export async function loadSnowcatShapes(): Promise<Map<number, Texture>> {
   const entries = await Promise.all(
-    Object.keys(SNOWCAT_SHAPES).map(async (key) => {
+    Object.entries(SNOWCAT_SHAPE_SVGS).map(async ([key, svg]) => {
       const id = Number(key);
       const texture = await Assets.load<Texture>({
         alias: `snowcat:${id}`,
-        src: `assets/snowcat/${id}.svg`,
+        src: svgDataUri(svg),
       });
       return [id, texture] as const;
     }),
@@ -101,16 +106,17 @@ export type RoomAssets =
     };
 
 /**
- * Load the SVG textures used by a room's background/foreground art. PIXI caches
- * each texture under a stable alias, so revisiting a room does not refetch it;
- * an unknown room id falls back to the plain Snow Room (`penguin1`).
+ * Load the SVG textures used by a room's background/foreground art. The art is
+ * bundled into the JS at build time (`ROOM_SVGS`), so each is loaded as an
+ * inline `data:` URI with no network request; PIXI caches each under a stable
+ * alias. An unknown room id falls back to the plain Snow Room (`penguin1`).
  */
 export async function loadRoomAssets(roomId: string): Promise<RoomAssets> {
   switch (roomId) {
     case "northpole": {
       const northpole = await Assets.load<Texture>({
         alias: "room:northpole",
-        src: ASSET_ROOM_NORTHPOLE,
+        src: svgDataUri(ROOM_SVGS.northpole),
       });
       return { roomId: "northpole", northpole };
     }
@@ -118,12 +124,15 @@ export async function loadRoomAssets(roomId: string): Promise<RoomAssets> {
       const [crashedBobcat, wave, bobcatLayer2] = await Promise.all([
         Assets.load<Texture>({
           alias: "room:crashedbobcat",
-          src: ASSET_ROOM_CRASHED_BOBCAT,
+          src: svgDataUri(ROOM_SVGS.crashedbobcat),
         }),
-        Assets.load<Texture>({ alias: "room:wave", src: ASSET_ROOM_WAVE }),
+        Assets.load<Texture>({
+          alias: "room:wave",
+          src: svgDataUri(ROOM_SVGS.wave),
+        }),
         Assets.load<Texture>({
           alias: "room:bobcatlayer2",
-          src: ASSET_ROOM_BOBCAT_LAYER2,
+          src: svgDataUri(ROOM_SVGS.bobcatlayer2),
         }),
       ]);
       return { roomId: "crashsite", crashedBobcat, wave, bobcatLayer2 };
