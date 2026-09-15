@@ -4,6 +4,7 @@ import {
   RenderLayer,
   Sprite,
   Text,
+  type Renderer,
   type Spritesheet,
 } from "pixi.js";
 import { gsap } from "gsap/gsap-core";
@@ -97,6 +98,7 @@ export class World extends Container {
   private waveOnSecondFrame = false;
   private margin = 0;
   private resolutionIndex = 0;
+  private readonly baseResolution: number;
   private container: HTMLElement | undefined;
   private unsubscribers: Array<() => void> = [];
 
@@ -112,10 +114,15 @@ export class World extends Container {
     if (!document.hidden) this.resync();
   };
 
-  constructor(socket: GameClient, spritesheet: Spritesheet) {
+  constructor(
+    socket: GameClient,
+    spritesheet: Spritesheet,
+    private readonly renderer: Renderer,
+  ) {
     super();
     this.socket = socket;
     this.spritesheet = spritesheet;
+    this.baseResolution = renderer.resolution;
   }
 
   /** Build the scene and subscribe to the room. */
@@ -377,15 +384,15 @@ export class World extends Container {
   }
 
   /**
-   * The chat input is an HTML element overlaying the Pixi canvas, so the whole
-   * `#app` container is zoomed rather than the canvas alone; that keeps the two
-   * aligned and lets the page reflow around the larger canvas.
+   * Resize the canvas for the current level: the `#app` container is zoomed so
+   * the canvas (and the HTML chat input overlaying it) grows together, and the
+   * renderer resolution is reset to match so the larger canvas still renders at
+   * full pixel density instead of being a stretched, blurry bitmap.
    */
   private applyResolution(): void {
-    this.container?.style.setProperty(
-      "zoom",
-      String(RES_ZOOM_LEVELS[this.resolutionIndex]),
-    );
+    const scale = RES_ZOOM_LEVELS[this.resolutionIndex];
+    this.container?.style.setProperty("zoom", String(scale));
+    this.renderer.resolution = this.baseResolution * scale;
   }
 
   private bindSocket(): void {
@@ -541,6 +548,7 @@ export class World extends Container {
     this.chatInput?.remove();
     this.container?.style.setProperty("zoom", "1");
     this.container = undefined;
+    this.renderer.resolution = this.baseResolution;
 
     for (const unsubscribe of this.unsubscribers) unsubscribe();
     this.unsubscribers = [];

@@ -158,7 +158,7 @@ export class App {
         delay(CONNECT_DELAY_MS),
       ]);
 
-      const world = new World(client, spritesheet);
+      const world = new World(client, spritesheet, this.app.renderer);
       world.onDisconnect = () => {
         this.teardownSocket();
         void this.showLoggedOff();
