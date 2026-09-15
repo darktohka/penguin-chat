@@ -36,6 +36,8 @@ import {
   LOG_X,
   LOG_Y,
   LOG_BUTTON_POS,
+  RES_BUTTON_POS,
+  RES_ZOOM_LEVELS,
   NORTHPOLE_ORIGIN,
   NORTHPOLE_SVG_OFFSET,
   SEND_BUTTON_POS,
@@ -94,6 +96,8 @@ export class World extends Container {
   private waveTimer: ReturnType<typeof gsap.delayedCall> | undefined;
   private waveOnSecondFrame = false;
   private margin = 0;
+  private resolutionIndex = 0;
+  private container: HTMLElement | undefined;
   private unsubscribers: Array<() => void> = [];
 
   /** Called when the user clicks the disconnect button. */
@@ -118,6 +122,7 @@ export class World extends Container {
   async init(container: HTMLElement, join: JoinPayload): Promise<void> {
     this.margin = (join.room.margin as number | undefined) ?? 0;
     this.roomId = join.roomId;
+    this.container = container;
     const room = await loadRoomAssets(join.roomId);
     this.buildWorld(room);
     this.buildChatLog();
@@ -285,6 +290,18 @@ export class World extends Container {
     logButton.position.set(LOG_BUTTON_POS.x, LOG_BUTTON_POS.y);
     this.toolbar.addChild(logButton);
 
+    if (EXTENDED) {
+      const resButton = new IconButton({
+        icon: "res",
+        onClick: () => this.cycleResolution(),
+        help: { text: "Change resolution", align: "left" },
+        onHelp: (help) => this.showHelp(help),
+      });
+      resButton.position.set(RES_BUTTON_POS.x, RES_BUTTON_POS.y);
+      this.toolbar.addChild(resButton);
+      this.applyResolution();
+    }
+
     const disconnectButton = new IconButton({
       icon: "disconnect",
       onClick: () => this.onDisconnect?.(),
@@ -352,6 +369,23 @@ export class World extends Container {
       HELP_TEXT_TOP,
     );
     this.helpLabel.visible = true;
+  }
+
+  private cycleResolution(): void {
+    this.resolutionIndex = (this.resolutionIndex + 1) % RES_ZOOM_LEVELS.length;
+    this.applyResolution();
+  }
+
+  /**
+   * The chat input is an HTML element overlaying the Pixi canvas, so the whole
+   * `#app` container is zoomed rather than the canvas alone; that keeps the two
+   * aligned and lets the page reflow around the larger canvas.
+   */
+  private applyResolution(): void {
+    this.container?.style.setProperty(
+      "zoom",
+      String(RES_ZOOM_LEVELS[this.resolutionIndex]),
+    );
   }
 
   private bindSocket(): void {
@@ -505,6 +539,8 @@ export class World extends Container {
     this.waveTimer?.kill();
     this.waveTimer = undefined;
     this.chatInput?.remove();
+    this.container?.style.setProperty("zoom", "1");
+    this.container = undefined;
 
     for (const unsubscribe of this.unsubscribers) unsubscribe();
     this.unsubscribers = [];

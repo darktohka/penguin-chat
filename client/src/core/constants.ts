@@ -106,7 +106,12 @@ export const CHAT_INPUT_HEIGHT = 22;
 export const CHAT_INPUT_MAX_LENGTH = 60;
 export const SEND_BUTTON_POS = { x: 210, y: TOOLBAR_Y } as const;
 export const LOG_BUTTON_POS = { x: 236, y: TOOLBAR_Y } as const;
+/** "res" button, immediately to the right of the log button (extended). */
+export const RES_BUTTON_POS = { x: 262, y: TOOLBAR_Y } as const;
 export const DISCONNECT_BUTTON_POS = { x: 560, y: TOOLBAR_Y } as const;
+
+/** Canvas zooms cycled by the "res" button: 100% → 125% → 150% → 100%. */
+export const RES_ZOOM_LEVELS = [1, 1.25, 1.5] as const;
 
 /* Penguin sprite (`Penguin`) ----------------------------------------------- */
 
