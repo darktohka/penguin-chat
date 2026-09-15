@@ -29,7 +29,9 @@ used for the high-frequency in-room events.
 Players are grouped into rooms. A room is chosen with the optional `room` field
 of the `join` request; each room keeps its own player set and its own broadcast
 scope, so a player only ever sees `A`/`R`/`X`/`C`/`E`/`P` frames from players in
-the same room.
+the same room. There is no in-session room-change message on the wire: to switch
+rooms the client disconnects (which broadcasts `R` to the room it is leaving)
+and reconnects with a fresh `join` request carrying the desired `room`.
 
 | Room id     | Display name | Notes                                   |
 | ----------- | ------------ | --------------------------------------- |

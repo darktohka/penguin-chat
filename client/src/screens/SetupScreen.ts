@@ -9,7 +9,6 @@ import {
   MAX_NICKNAME_LENGTH,
   MENU_BUTTON_HEIGHT,
   MENU_BUTTON_WIDTH,
-  ROOMS,
   SETUP_INPUT_HEIGHT,
   SETUP_INPUT_POS,
   SETUP_INPUT_WIDTH,
@@ -19,11 +18,10 @@ import {
   SETUP_PROMPT_POS,
   SETUP_PROMPT_TEXT,
   SETUP_RADIO_FIRST_Y,
-  SETUP_RADIO_GAP,
   SETUP_RADIO_X,
 } from "../core/constants";
 import { Button } from "../pixi/Button";
-import { RadioButton } from "../pixi/RadioButton";
+import { RoomSelector } from "../pixi/RoomSelector";
 import { BaseScreen } from "./BaseScreen";
 
 /**
@@ -36,8 +34,7 @@ export class SetupScreen extends BaseScreen {
     | ((username: string | undefined, roomId: string) => void)
     | undefined;
 
-  private readonly roomRadios = new Map<string, RadioButton>();
-  private selectedRoomId = DEFAULT_ROOM_ID;
+  private roomSelector!: RoomSelector;
   private nameInput!: HTMLInputElement;
 
   constructor(private readonly container: HTMLElement) {
@@ -63,9 +60,8 @@ export class SetupScreen extends BaseScreen {
     this.addChild(prompt);
 
     this.buildNameInput();
-    this.buildRoomRadios();
+    this.buildRoomSelector();
     this.buildNextButton();
-    this.selectRoom(DEFAULT_ROOM_ID);
   }
 
   /** Append the nickname `<input>` as a DOM overlay, like the chat toolbar. */
@@ -98,20 +94,10 @@ export class SetupScreen extends BaseScreen {
     this.nameInput.focus();
   }
 
-  private buildRoomRadios(): void {
-    ROOMS.forEach((room, index) => {
-      const radio = new RadioButton({
-        label: room.name,
-        selected: room.id === DEFAULT_ROOM_ID,
-        onChange: () => this.selectRoom(room.id),
-      });
-      radio.position.set(
-        SETUP_RADIO_X,
-        SETUP_RADIO_FIRST_Y + index * SETUP_RADIO_GAP,
-      );
-      this.roomRadios.set(room.id, radio);
-      this.addChild(radio);
-    });
+  private buildRoomSelector(): void {
+    this.roomSelector = new RoomSelector({ roomId: DEFAULT_ROOM_ID });
+    this.roomSelector.position.set(SETUP_RADIO_X, SETUP_RADIO_FIRST_Y);
+    this.addChild(this.roomSelector);
   }
 
   private buildNextButton(): void {
@@ -128,17 +114,9 @@ export class SetupScreen extends BaseScreen {
     this.addChild(next);
   }
 
-  /** Highlight the selected room and remember it for the join request. */
-  private selectRoom(roomId: string): void {
-    this.selectedRoomId = roomId;
-    for (const [id, radio] of this.roomRadios) {
-      radio.setSelected(id === roomId);
-    }
-  }
-
   private submit(): void {
     const username = this.nameInput.value.trim();
-    this.onNext?.(username || undefined, this.selectedRoomId);
+    this.onNext?.(username || undefined, this.roomSelector.selectedRoomId);
   }
 
   override destroy(options?: Parameters<Container["destroy"]>[0]): void {

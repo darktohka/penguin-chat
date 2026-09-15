@@ -54,6 +54,8 @@ export class App {
   private current: Container | null = null;
   private socket: GameClient | null = null;
   private intentionalDisconnect = false;
+  private username: string | undefined;
+  private roomId: string = DEFAULT_ROOM_ID;
 
   constructor(
     private readonly app: Application,
@@ -128,6 +130,8 @@ export class App {
     username: string | undefined,
     roomId: string,
   ): Promise<void> {
+    this.username = username;
+    this.roomId = roomId;
     await this.showStatus("Connecting to Server");
 
     const client = new GameClient({ url: defaultSocketUrl(), game: GAME_ID });
@@ -159,6 +163,7 @@ export class App {
         this.teardownSocket();
         void this.showLoggedOff();
       };
+      world.onRoomChange = (roomId) => void this.switchRoom(roomId);
       await world.init(this.container, joinPayload);
       this.setScreen(world);
     } catch (error) {
@@ -167,5 +172,12 @@ export class App {
         await this.showUnavailable();
       }
     }
+  }
+
+  /** Tear down the current session and reconnect into another room. */
+  private async switchRoom(roomId: string): Promise<void> {
+    if (roomId === this.roomId) return;
+    this.teardownSocket();
+    await this.play(this.username, roomId);
   }
 }

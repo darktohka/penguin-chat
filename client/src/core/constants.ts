@@ -8,6 +8,13 @@ export const GAME_HEIGHT = 400;
 export const GAME_ID = "penguin1";
 export const ROOM_ID = "penguin1";
 
+/**
+ * In-room room selector (SWF main-timeline frames 30-32, sprite 159):
+ * circle-centre x and first-row centre y, matching `swf/frames/30.png`.
+ */
+export const WORLD_ROOM_RADIO_X = 477.5;
+export const WORLD_ROOM_RADIO_FIRST_Y = 34.5;
+
 /** Delay before `guest()` is sent and again while loading the world (ms). */
 export const CONNECT_DELAY_MS = 800;
 
@@ -172,10 +179,9 @@ export const SETUP_PROMPT_LINE_HEIGHT = 13.3;
 export const SETUP_INPUT_POS = { x: 215, y: 267 } as const;
 export const SETUP_INPUT_WIDTH = 170;
 export const SETUP_INPUT_HEIGHT = 22;
-/** Room radio group: circle-centre x, first row centre y, and row spacing. */
+/** Room radio group: circle-centre x and first row centre y. */
 export const SETUP_RADIO_X = 420;
 export const SETUP_RADIO_FIRST_Y = 245;
-export const SETUP_RADIO_GAP = 16;
 /** "Next" button, sitting a little below the name field. */
 export const SETUP_NEXT_BUTTON_POS = { x: 300, y: 315 } as const;
 
@@ -190,6 +196,8 @@ export const RADIO_STROKE_WIDTH = 1;
 export const RADIO_LABEL_GAP = 10;
 export const RADIO_LABEL_COLOR = 0x000000;
 export const RADIO_LABEL_FONT_SIZE = 11;
+/** Vertical spacing between radio rows (SWF: 16px). */
+export const RADIO_ROW_GAP = 16;
 
 /* Room backgrounds (extended) ----------------------------------------------- */
 

@@ -5,6 +5,7 @@ import {
   CHAT_INPUT_LEFT,
   CHAT_INPUT_MAX_LENGTH,
   CHAT_INPUT_WIDTH,
+  DEFAULT_ROOM_ID,
   DISCONNECT_BUTTON_POS,
   EXTENDED,
   FONT_UI,
@@ -35,11 +36,14 @@ import {
   WAVE_BOB_SECONDS,
   WAVE_FRAME_A,
   WAVE_FRAME_B,
+  WORLD_ROOM_RADIO_FIRST_Y,
+  WORLD_ROOM_RADIO_X,
 } from "../core/constants";
 import type { GameClient, GameEvents } from "../net/GameClient";
 import { playPop } from "../audio/sfx";
 import { loadRoomAssets, type RoomAssets } from "../pixi/assets";
 import { IconButton, type IconHelp } from "../pixi/IconButton";
+import { RoomSelector } from "../pixi/RoomSelector";
 import { Penguin } from "./Penguin";
 
 /** Clamp a value to `[min, max]`. */
@@ -74,6 +78,9 @@ export class World extends Container {
   private chatInput!: HTMLInputElement;
   private sendButton!: IconButton;
   private helpLabel: Text | undefined;
+  private roomSelector: RoomSelector | undefined;
+  private roomId = DEFAULT_ROOM_ID;
+  private reconnecting = false;
   private chatCooldownTimer: ReturnType<typeof gsap.delayedCall> | undefined;
   private waveTimer: ReturnType<typeof gsap.delayedCall> | undefined;
   private waveOnSecondFrame = false;
@@ -82,6 +89,9 @@ export class World extends Container {
 
   /** Called when the user clicks the disconnect button. */
   public onDisconnect: (() => void) | undefined;
+
+  /** Called when the user picks a different room from the in-room selector. */
+  public onRoomChange: ((roomId: string) => void) | undefined;
 
   private readonly keyHandler = (event: KeyboardEvent): void =>
     this.handleKey(event);
@@ -98,6 +108,7 @@ export class World extends Container {
   /** Build the scene and subscribe to the room. */
   async init(container: HTMLElement, join: JoinPayload): Promise<void> {
     this.margin = (join.room.margin as number | undefined) ?? 0;
+    this.roomId = join.roomId;
     const room = await loadRoomAssets(join.roomId);
     this.buildWorld(room);
     this.buildChatLog();
@@ -291,7 +302,29 @@ export class World extends Container {
       this.toolbar.addChild(this.helpLabel);
     }
 
+    if (EXTENDED) {
+      this.roomSelector = new RoomSelector({
+        roomId: this.roomId,
+        onSelect: (roomId) => this.requestRoomChange(roomId),
+      });
+      this.roomSelector.position.set(
+        WORLD_ROOM_RADIO_X,
+        WORLD_ROOM_RADIO_FIRST_Y,
+      );
+      this.toolbar.addChild(this.roomSelector);
+    }
+
     this.addChild(this.toolbar);
+  }
+
+  /**
+   * Ask the app to reconnect into `roomId`; the app tears this screen down and
+   * rebuilds it, so a second click arriving before teardown is ignored.
+   */
+  private requestRoomChange(roomId: string): void {
+    if (this.reconnecting || roomId === this.roomId) return;
+    this.reconnecting = true;
+    this.onRoomChange?.(roomId);
   }
 
   /** Show (or clear) the gray hover help label next to the toolbar buttons. */
