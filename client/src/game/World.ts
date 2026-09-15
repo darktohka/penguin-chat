@@ -2,11 +2,9 @@ import {
   Container,
   Graphics,
   RenderLayer,
-  Sprite,
   Text,
   type Renderer,
   type Spritesheet,
-  type Texture,
 } from "pixi.js";
 import { gsap } from "gsap/gsap-core";
 import {
@@ -56,11 +54,12 @@ import {
   zoomScale,
 } from "../core/resolution";
 import type { GameClient, GameEvents } from "../net/GameClient";
-import { playPop } from "../audio/sfx";
+import { playPop, playSnowcatToggle } from "../audio/sfx";
 import {
   loadRoomAssets,
   loadSnowcatShapes,
   type RoomAssets,
+  type SvgAsset,
 } from "../pixi/assets";
 import { IconButton, type IconHelp } from "../pixi/IconButton";
 import { RoomSelector } from "../pixi/RoomSelector";
@@ -98,7 +97,8 @@ export class World extends Container {
     Character,
     ReturnType<typeof gsap.timeline>
   >();
-  private snowcatShapes: ReadonlyMap<number, Texture> | undefined;
+  private snowcatShapes: ReadonlyMap<number, SvgAsset> | undefined;
+  private snowcatChimePlaying = false;
 
   private chatInput!: HTMLInputElement;
   private sendButton!: IconButton;
@@ -210,7 +210,7 @@ export class World extends Container {
       case "penguin1":
         return;
       case "northpole": {
-        const shape = new Sprite(room.northpole);
+        const shape = new Graphics(room.northpole.context);
         shape.position.set(
           NORTHPOLE_ORIGIN.x - NORTHPOLE_SVG_OFFSET.x,
           NORTHPOLE_ORIGIN.y - NORTHPOLE_SVG_OFFSET.y,
@@ -219,30 +219,30 @@ export class World extends Container {
         shape.cursor = "pointer";
         shape.on("pointerdown", (event) => {
           event.stopPropagation();
+          if (this.snowcatChimePlaying) return;
           const enabled = this.onToggleSnowcat?.();
           if (enabled === undefined) return;
-          this.addChatLine(
-            enabled
-              ? "Snowcat mode on - rejoin a room to apply"
-              : "Snowcat mode off - rejoin a room to apply",
-          );
+          this.snowcatChimePlaying = true;
+          void playSnowcatToggle(enabled).finally(() => {
+            this.snowcatChimePlaying = false;
+          });
         });
         this.backgroundLayer.addChild(shape);
         return;
       }
       case "crashsite": {
-        const background = new Sprite(room.crashedBobcat);
-        background.position.set(0, GAME_HEIGHT - background.height);
+        const background = new Graphics(room.crashedBobcat.context);
+        background.position.set(0, GAME_HEIGHT - room.crashedBobcat.height);
         this.backgroundLayer.addChild(background);
 
-        const wave = new Sprite(room.wave);
-        wave.anchor.set(0.5);
+        const wave = new Graphics(room.wave.context);
+        wave.pivot.set(room.wave.width / 2, room.wave.height / 2);
         wave.position.set(WAVE_FRAME_A.x, WAVE_FRAME_A.y);
         this.backgroundLayer.addChild(wave);
         this.startWaveBob(wave);
 
-        const foreground = new Sprite(room.bobcatLayer2);
-        foreground.position.set(0, GAME_HEIGHT - foreground.height);
+        const foreground = new Graphics(room.bobcatLayer2.context);
+        foreground.position.set(0, GAME_HEIGHT - room.bobcatLayer2.height);
         this.foregroundLayer.addChild(foreground);
         return;
       }
@@ -253,7 +253,7 @@ export class World extends Container {
     }
   }
 
-  private startWaveBob(wave: Sprite): void {
+  private startWaveBob(wave: Graphics): void {
     const bob = (): void => {
       this.waveOnSecondFrame = !this.waveOnSecondFrame;
       const frame = this.waveOnSecondFrame ? WAVE_FRAME_B : WAVE_FRAME_A;

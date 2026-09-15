@@ -1,4 +1,4 @@
-import { Container, Sprite, type RenderLayer, type Texture } from "pixi.js";
+import { Container, Graphics, type RenderLayer } from "pixi.js";
 import { gsap } from "gsap/gsap-core";
 import {
   PENGUIN_DEFAULT_DIRECTION,
@@ -9,6 +9,7 @@ import {
   SNOWCAT_SHAPES,
   SNOWCAT_WALK_STEP_SECONDS,
 } from "../core/constants";
+import type { SvgAsset } from "../pixi/assets";
 import { Character } from "./Character";
 
 type Delayed = ReturnType<typeof gsap.delayedCall>;
@@ -20,11 +21,11 @@ type Delayed = ReturnType<typeof gsap.delayedCall>;
  * `DefineSprite_138`); directions 6-8 reuse 4-2 mirrored.
  */
 export class Snowcat extends Character {
-  private readonly shapes: ReadonlyMap<number, Texture>;
+  private readonly shapes: ReadonlyMap<number, SvgAsset>;
   private readonly composite = new Container();
   private readonly art = new Container();
-  private readonly lower = new Sprite();
-  private readonly upper = new Sprite();
+  private readonly lower = new Graphics();
+  private readonly upper = new Graphics();
 
   private lowerIds: readonly [number, number] =
     SNOWCAT_POSES[PENGUIN_DEFAULT_DIRECTION].lower;
@@ -36,7 +37,7 @@ export class Snowcat extends Character {
     displayName: string,
     x: number,
     y: number,
-    shapes: ReadonlyMap<number, Texture>,
+    shapes: ReadonlyMap<number, SvgAsset>,
     overlayLayer: RenderLayer,
     isLocal = false,
   ) {
@@ -101,16 +102,13 @@ export class Snowcat extends Character {
     this.place(this.lower, this.lowerIds[this.lowerPose]);
   }
 
-  /** Point `sprite` at `id`, anchored so the shape's SWF origin sits at (0,0). */
-  private place(sprite: Sprite, id: number): void {
-    const texture = this.shapes.get(id);
+  /** Point `graphics` at `id`, pivoted so the shape's SWF origin sits at (0,0). */
+  private place(graphics: Graphics, id: number): void {
+    const asset = this.shapes.get(id);
     const shape = SNOWCAT_SHAPES[id];
-    if (!texture || !shape) throw new Error(`Missing snowcat shape ${id}`);
-    sprite.texture = texture;
-    sprite.anchor.set(
-      shape.origin[0] / shape.size[0],
-      shape.origin[1] / shape.size[1],
-    );
+    if (!asset || !shape) throw new Error(`Missing snowcat shape ${id}`);
+    graphics.context = asset.context;
+    graphics.pivot.set(shape.origin[0], shape.origin[1]);
   }
 
   override destroy(options?: Parameters<Container["destroy"]>[0]): void {

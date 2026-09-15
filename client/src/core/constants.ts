@@ -335,6 +335,12 @@ export const ICON_HOVER_FILL_EXTENDED = 0xff0000;
 /** SWF sound 111; played when a penguin enters or leaves the world. */
 export const ASSET_POP_SOUND = "sounds/111.wav";
 
+/** Chime played when the north pole snowcat flag is switched on. */
+export const ASSET_SNOWCAT_ON_SOUND = "sounds/snowcat-on.ogg";
+
+/** Chime played when the north pole snowcat flag is switched off. */
+export const ASSET_SNOWCAT_OFF_SOUND = "sounds/snowcat-off.ogg";
+
 /* Assets ------------------------------------------------------------------- */
 
 export const ASSET_SHEET = "assets/penguin/penguin.json";

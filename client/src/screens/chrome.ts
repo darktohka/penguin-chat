@@ -1,4 +1,4 @@
-import { Container, Sprite, Text, type Texture } from "pixi.js";
+import { Container, Graphics, Text } from "pixi.js";
 import {
   COPYRIGHT_TEXT_COLOR,
   FOOTER_TEXT_GAP,
@@ -10,10 +10,11 @@ import {
   TITLE_POS,
   VERSION_TEXT_COLOR,
 } from "../core/constants";
+import type { SvgAsset } from "../pixi/assets";
 
 /** The title artwork shown on the title/status/end screens. */
-export function createTitle(texture: Texture): Sprite {
-  const title = new Sprite(texture);
+export function createTitle(asset: SvgAsset): Graphics {
+  const title = new Graphics(asset.context);
   title.position.set(TITLE_POS.x, TITLE_POS.y);
   return title;
 }
@@ -21,11 +22,11 @@ export function createTitle(texture: Texture): Sprite {
 /**
  * The RocketSnail footer: logo, copyright line and version number.
  */
-export function createFooter(rocketsnail: Texture): Container {
+export function createFooter(rocketsnail: SvgAsset): Container {
   const container = new Container();
 
-  const logo = new Sprite(rocketsnail);
-  logo.anchor.set(0.5, 1);
+  const logo = new Graphics(rocketsnail.context);
+  logo.pivot.set(rocketsnail.width / 2, rocketsnail.height);
   logo.scale.set(ROCKETSNAIL_SCALE);
   container.addChild(logo);
 

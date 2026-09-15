@@ -1,4 +1,4 @@
-import { Container, Sprite } from "pixi.js";
+import { Container, Graphics } from "pixi.js";
 import { gsap } from "gsap/gsap-core";
 import { SPINNER_STEP_SECONDS } from "../core/constants";
 import { backEase } from "./easing";
@@ -9,9 +9,9 @@ import { loadChromeTexture } from "./assets";
  */
 export async function createSpinner(): Promise<Container> {
   const container = new Container();
-  const texture = await loadChromeTexture("loading");
-  const ring = new Sprite(texture);
-  ring.anchor.set(0.5);
+  const asset = await loadChromeTexture("loading");
+  const ring = new Graphics(asset.context);
+  ring.pivot.set(asset.width / 2, asset.height / 2);
   container.addChild(ring);
 
   const timeline = gsap.timeline({ repeat: -1 });
