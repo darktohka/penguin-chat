@@ -6,6 +6,7 @@ import {
   FONT_NARROW,
   GAME_VERSION,
   GAME_WIDTH,
+  ROCKETSNAIL_SCALE,
   TITLE_POS,
   VERSION_TEXT_COLOR,
 } from "../core/constants";
@@ -25,6 +26,7 @@ export function createFooter(rocketsnail: Texture): Container {
 
   const logo = new Sprite(rocketsnail);
   logo.anchor.set(0.5, 1);
+  logo.scale.set(ROCKETSNAIL_SCALE);
   container.addChild(logo);
 
   const copyright = new Text({

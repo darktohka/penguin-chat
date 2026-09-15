@@ -18,7 +18,7 @@ export interface IconHelp {
 
 /** Options for an `IconButton`. */
 export interface IconButtonOptions {
-  /** Icon alias, one of the keys of `ICON_SOURCES`. */
+  /** Icon name, one of the keys of `ICON_SVGS`. */
   icon: string;
   onClick: () => void;
   /** Help label to expose while hovering (extended). */

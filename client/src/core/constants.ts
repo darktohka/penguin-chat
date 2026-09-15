@@ -338,42 +338,10 @@ export const ASSET_POP_SOUND = "sounds/111.wav";
 /* Assets ------------------------------------------------------------------- */
 
 export const ASSET_SHEET = "assets/penguin/penguin.json";
-export const ASSET_TITLE = [
-  "images/title@1x.png",
-  "images/title@2x.png",
-  "images/title@4x.png",
-];
-export const ASSET_LOADING = [
-  "images/loading@1x.png",
-  "images/loading@2x.png",
-  "images/loading@4x.png",
-];
-export const ASSET_ROCKETSNAIL = [
-  "images/rocketsnail@1x.png",
-  "images/rocketsnail@2x.png",
-  "images/rocketsnail@4x.png",
-];
 
-/** Icon sprite sources, keyed by the alias suffix used at load time. */
-export const ICON_SOURCES: Record<string, [string, string, string]> = {
-  send: [
-    "icons/icon_send@1x.png",
-    "icons/icon_send@2x.png",
-    "icons/icon_send@4x.png",
-  ],
-  log: [
-    "icons/icon_log@1x.png",
-    "icons/icon_log@2x.png",
-    "icons/icon_log@4x.png",
-  ],
-  res: [
-    "icons/icon_res@1x.png",
-    "icons/icon_res@2x.png",
-    "icons/icon_res@4x.png",
-  ],
-  disconnect: [
-    "icons/icon_disconnect@1x.png",
-    "icons/icon_disconnect@2x.png",
-    "icons/icon_disconnect@4x.png",
-  ],
-};
+/**
+ * Scale applied to the RocketSnail footer logo. The SWF composes the logo button
+ * at 0.62657166 (main timeline frame 2), so scaling the raw `rocketsnail.svg` by
+ * the same amount keeps the footer at its original on-screen size.
+ */
+export const ROCKETSNAIL_SCALE = 0.62657166;

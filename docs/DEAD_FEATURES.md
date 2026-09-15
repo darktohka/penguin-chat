@@ -50,7 +50,7 @@ playerAdded, playerRemoved, playerMoved, chat, info, message
 
 | Asset                                 | Status                                                                                                                        |
 | ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `icons/icon_res@1x.png`, `@2x`, `@4x` | Declared in the icon asset map and downloaded, but no button references `res`. Only `send`, `log`, and `disconnect` are used. |
+| `src/assets/icons/res.svg` | Placed by the original SWF (shape 165) but wired to a button only in the extended client; unused when `EXTENDED` is off. |
 
 ## Not dead (looks unreachable to a naive grep)
 

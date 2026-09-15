@@ -1,14 +1,9 @@
 import { Assets, Sprite, Texture, type Spritesheet } from "pixi.js";
+import { CHROME_SVGS } from "../assets/chromeSvgs";
+import { ICON_SVGS } from "../assets/iconSvgs";
 import { ROOM_SVGS } from "../assets/roomSvgs";
 import { SNOWCAT_SHAPE_SVGS } from "../assets/snowcatShapes";
-import {
-  ASSET_LOADING,
-  ASSET_ROCKETSNAIL,
-  ASSET_SHEET,
-  ASSET_TITLE,
-  ICON_SOURCES,
-  MAX_RESOLUTION,
-} from "../core/constants";
+import { ASSET_SHEET, MAX_RESOLUTION } from "../core/constants";
 
 // Pixi's SVG loader expects a URL, so inlined SVG text is encoded as a `data:` URI.
 function svgDataUri(svg: string): string {
@@ -32,10 +27,10 @@ export function loadSpritesheet(): Promise<Spritesheet> {
 /** Load the four toolbar icons under `icon:<name>` aliases. */
 export function loadIcons(): Promise<Array<Texture | Sprite>> {
   return Promise.all(
-    Object.keys(ICON_SOURCES).map((name) =>
+    Object.entries(ICON_SVGS).map(([name, svg]) =>
       Assets.load<Texture>({
         alias: `icon:${name}`,
-        src: [...ICON_SOURCES[name]],
+        src: svgDataUri(svg),
       }),
     ),
   );
@@ -48,16 +43,27 @@ export function iconSprite(name: string): Sprite {
   return sprite;
 }
 
-/** Load the multi-resolution title / loading / RocketSnail textures. */
+/**
+ * Load a chrome texture (`title`, `loading` or `rocketsnail`) from its bundled
+ * SVG. PIXI caches each under a stable alias, so reloading is free.
+ */
+export function loadChromeTexture(name: string): Promise<Texture> {
+  return Assets.load<Texture>({
+    alias: `chrome:${name}`,
+    src: svgDataUri(CHROME_SVGS[name]),
+  });
+}
+
+/** Load the title / loading / RocketSnail textures used by the chrome. */
 export async function loadChrome(): Promise<{
   title: Texture;
   loading: Texture;
   rocketsnail: Texture;
 }> {
   const [title, loading, rocketsnail] = await Promise.all([
-    Assets.load<Texture>({ alias: "title", src: [...ASSET_TITLE] }),
-    Assets.load<Texture>({ alias: "loading", src: [...ASSET_LOADING] }),
-    Assets.load<Texture>({ alias: "rocketsnail", src: [...ASSET_ROCKETSNAIL] }),
+    loadChromeTexture("title"),
+    loadChromeTexture("loading"),
+    loadChromeTexture("rocketsnail"),
   ]);
   return { title, loading, rocketsnail };
 }

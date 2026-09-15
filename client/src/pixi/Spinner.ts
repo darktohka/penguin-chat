@@ -1,17 +1,15 @@
-import { Assets, Container, Sprite, type Texture } from "pixi.js";
+import { Container, Sprite } from "pixi.js";
 import { gsap } from "gsap/gsap-core";
-import { ASSET_LOADING, SPINNER_STEP_SECONDS } from "../core/constants";
+import { SPINNER_STEP_SECONDS } from "../core/constants";
 import { backEase } from "./easing";
+import { loadChromeTexture } from "./assets";
 
 /**
  * The rotating loading ring shown while connecting and loading the world.
  */
 export async function createSpinner(): Promise<Container> {
   const container = new Container();
-  const texture = await Assets.load<Texture>({
-    alias: "loading",
-    src: [...ASSET_LOADING],
-  });
+  const texture = await loadChromeTexture("loading");
   const ring = new Sprite(texture);
   ring.anchor.set(0.5);
   container.addChild(ring);
